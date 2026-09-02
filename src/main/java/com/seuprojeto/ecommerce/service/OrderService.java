@@ -25,6 +25,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final CartItemRepository cartItemRepository;
     private final CartService cartService;
+    private final EmailService emailService;
 
     /**
      * Cria o pedido a partir do carrinho do usuário.
@@ -124,7 +125,13 @@ public class OrderService {
     @Transactional
     public OrderResponse updateStatus(Long id, OrderStatus newStatus) {
         Order order = findEntity(id);
+        OrderStatus previousStatus = order.getStatus();
         order.setStatus(newStatus);
+
+        if (previousStatus != newStatus) {
+            emailService.sendOrderStatusChangedEmail(order, previousStatus);
+        }
+
         return toResponse(order);
     }
 

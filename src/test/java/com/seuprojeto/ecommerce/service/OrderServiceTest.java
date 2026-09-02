@@ -41,6 +41,7 @@ class OrderServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private CartItemRepository cartItemRepository;
     @Mock private CartService cartService;
+    @Mock private EmailService emailService;
 
     private OrderService orderService;
 
@@ -49,7 +50,7 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartService);
+        orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartService, emailService);
 
         user = User.builder().id(1L).name("Comprador").email("comprador@teste.com").role(Role.CUSTOMER).build();
         product = Product.builder()
@@ -217,7 +218,7 @@ class OrderServiceTest {
     }
 
     @Test
-    void updateStatusAlteraOStatusDoPedido() {
+    void updateStatusAlteraOStatusDoPedidoENotificaPorEmail() {
         Order order = Order.builder().id(5L).user(user).status(OrderStatus.PENDING)
                 .totalAmount(BigDecimal.TEN).build();
         when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
@@ -226,6 +227,18 @@ class OrderServiceTest {
 
         assertThat(response.status()).isEqualTo(OrderStatus.SHIPPED);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        verify(emailService).sendOrderStatusChangedEmail(order, OrderStatus.PENDING);
+    }
+
+    @Test
+    void updateStatusNaoEnviaEmailQuandoOStatusInformadoEhOMesmo() {
+        Order order = Order.builder().id(5L).user(user).status(OrderStatus.PENDING)
+                .totalAmount(BigDecimal.TEN).build();
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+
+        orderService.updateStatus(5L, OrderStatus.PENDING);
+
+        verifyNoInteractions(emailService);
     }
 
     @Test

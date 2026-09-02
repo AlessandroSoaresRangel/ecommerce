@@ -26,6 +26,7 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final EmailService emailService;
 
     @Transactional
     public PaymentResponse pay(User requester, Long orderId, PaymentRequest request) {
@@ -50,7 +51,9 @@ public class PaymentService {
 
         Payment saved = paymentRepository.save(payment);
 
+        OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.PAID);
+        emailService.sendOrderStatusChangedEmail(order, previousStatus);
 
         return toResponse(saved);
     }

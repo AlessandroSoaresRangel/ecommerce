@@ -32,6 +32,7 @@ class PaymentServiceTest {
 
     @Mock private PaymentRepository paymentRepository;
     @Mock private OrderRepository orderRepository;
+    @Mock private EmailService emailService;
 
     private PaymentService paymentService;
 
@@ -42,7 +43,7 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        paymentService = new PaymentService(paymentRepository, orderRepository);
+        paymentService = new PaymentService(paymentRepository, orderRepository, emailService);
 
         dono = User.builder().id(1L).role(Role.CUSTOMER).build();
         estranho = User.builder().id(2L).role(Role.CUSTOMER).build();
@@ -66,6 +67,7 @@ class PaymentServiceTest {
 
         assertThat(response.status()).isEqualTo(PaymentStatus.APPROVED);
         assertThat(pedidoPendente.getStatus()).isEqualTo(OrderStatus.PAID);
+        verify(emailService).sendOrderStatusChangedEmail(pedidoPendente, OrderStatus.PENDING);
     }
 
     @Test
@@ -88,6 +90,7 @@ class PaymentServiceTest {
 
         verify(paymentRepository, never()).save(any());
         assertThat(pedidoPendente.getStatus()).isEqualTo(OrderStatus.PENDING);
+        verifyNoInteractions(emailService);
     }
 
     @Test
@@ -99,6 +102,7 @@ class PaymentServiceTest {
                 .isInstanceOf(InvalidOrderStatusException.class);
 
         verify(paymentRepository, never()).save(any());
+        verifyNoInteractions(emailService);
     }
 
     @Test

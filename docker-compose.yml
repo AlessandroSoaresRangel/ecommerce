@@ -27,6 +27,13 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ecommerce-mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # UI web (ver os e-mails "enviados")
+
   app:
     build: .
     container_name: ecommerce-app
@@ -35,12 +42,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ecommerce
       DB_USER: ecommerce
       DB_PASSWORD: ecommerce
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
     ports:
       - "8080:8080"
 

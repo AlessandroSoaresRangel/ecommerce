@@ -52,6 +52,12 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
+        <!-- E-mail (notificação de mudança de status do pedido) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Banco de dados -->
         <dependency>
             <groupId>org.postgresql</groupId>

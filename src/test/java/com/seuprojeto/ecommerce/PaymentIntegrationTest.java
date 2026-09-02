@@ -12,6 +12,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -80,11 +88,27 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         return objectMapper.readTree(checkoutResult.getResponse().getContentAsString()).get("id").asLong();
     }
 
+    // Consulta a API HTTP do Mailpit (o SMTP fake usado nos testes) pra
+    // confirmar que o e-mail de mudança de status realmente "chegou" —
+    // não basta confiar que o código chamou o mailSender, isso prova o
+    // efeito de ponta a ponta.
+    private JsonNode buscarEmailsRecebidosPor(String destinatario) throws Exception {
+        String query = URLEncoder.encode("to:" + destinatario, StandardCharsets.UTF_8);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(mailpitApiUrl() + "/api/v1/search?query=" + query))
+                .GET()
+                .build();
+        HttpResponse<String> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
+        return objectMapper.readTree(response.body());
+    }
+
     @Test
-    void donoConseguePagarOProprioPedidoEEleMudaParaPago() throws Exception {
+    void donoConseguePagarOProprioPedidoEEleMudaParaPagoENotificaPorEmail() throws Exception {
         String adminToken = registerAndGetAccessToken("admin-pag1@teste.com");
         promoteToAdmin("admin-pag1@teste.com");
-        String donoToken = registerAndGetAccessToken("dono-pag1@teste.com");
+        String donoEmail = "dono-pag1@teste.com";
+        String donoToken = registerAndGetAccessToken(donoEmail);
         long orderId = criarPedidoPendente(adminToken, donoToken, "1-" + System.nanoTime());
 
         String payBody = """
@@ -98,6 +122,10 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/orders/" + orderId).header("Authorization", "Bearer " + donoToken))
                 .andExpect(jsonPath("$.status").value("PAID"));
+
+        JsonNode emailsRecebidos = buscarEmailsRecebidosPor(donoEmail);
+        assertThat(emailsRecebidos.get("messages_count").asInt()).isEqualTo(1);
+        assertThat(emailsRecebidos.get("messages").get(0).get("Subject").asText()).contains(String.valueOf(orderId));
     }
 
     @Test
