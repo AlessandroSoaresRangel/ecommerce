@@ -38,4 +38,10 @@ public class Payment {
 
     @Column(name = "stripe_session_id", length = 255, unique = true)
     private String stripeSessionId;
+
+    // Stripe pode reentregar o mesmo webhook (ou completed/async_payment_succeeded
+    // chegarem quase juntos); isso evita que duas requisições concorrentes
+    // aprovem o mesmo pagamento em paralelo e disparem e-mail duplicado.
+    @Version
+    private Long version;
 }

@@ -83,7 +83,8 @@ public class ShippingGatewayImpl implements ShippingGateway {
         }
 
         return response.stream()
-                .filter(item -> item.error() == null)
+                // Sem "error" mas também sem preço: resposta malformada, não é uma cotação válida.
+                .filter(item -> item.error() == null && (item.customPrice() != null || item.price() != null))
                 .map(item -> new ShippingQuoteResult(
                         item.company() != null ? item.company().name() : null,
                         item.name(),

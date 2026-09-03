@@ -12,6 +12,13 @@ public interface StripeGateway {
 
     CheckoutSessionResult createCheckoutSession(Order order, Long paymentId);
 
+    /**
+     * Invalida uma Checkout Session que ainda esteja aberta (best-effort:
+     * falhas são apenas logadas, nunca propagadas). Usado ao reemitir o
+     * checkout de um pedido para que a URL antiga pare de ser pagável.
+     */
+    void expireSession(String sessionId);
+
     WebhookEventResult parseWebhookEvent(String payload, String signatureHeader);
 
     record CheckoutSessionResult(String sessionId, String checkoutUrl) {}

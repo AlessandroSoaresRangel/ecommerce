@@ -18,7 +18,10 @@ public class ShippingService {
     private final CartService cartService;
     private final ShippingGateway shippingGateway;
 
-    @Transactional(readOnly = true)
+    // Não pode ser readOnly: findOrCreateCart cria e persiste um carrinho
+    // novo se o usuário ainda não tiver um, e o Postgres rejeita INSERT
+    // dentro de uma transação somente-leitura.
+    @Transactional
     public List<ShippingOptionResponse> quote(User user, ShippingQuoteRequest request) {
         Cart cart = cartService.findOrCreateCart(user);
         if (cart.getItems().isEmpty()) {

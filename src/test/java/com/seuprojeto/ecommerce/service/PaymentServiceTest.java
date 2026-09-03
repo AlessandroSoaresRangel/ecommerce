@@ -73,6 +73,24 @@ class PaymentServiceTest {
         // A aprovação não é mais síncrona: o pedido continua PENDING até o webhook confirmar.
         assertThat(pedidoPendente.getStatus()).isEqualTo(OrderStatus.PENDING);
         verifyNoInteractions(emailService);
+        verify(stripeGateway, never()).expireSession(any());
+    }
+
+    @Test
+    void reemitirOCheckoutExpiraASessaoStripeAnteriorParaNaoDeixarUmaUrlOrfaPagavel() {
+        Payment paymentExistente = Payment.builder().id(1L).order(pedidoPendente)
+                .method("STRIPE").status(PaymentStatus.PENDING).stripeSessionId("cs_test_antiga").build();
+        when(orderRepository.findById(50L)).thenReturn(Optional.of(pedidoPendente));
+        when(paymentRepository.findByOrderId(50L)).thenReturn(Optional.of(paymentExistente));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(stripeGateway.createCheckoutSession(eq(pedidoPendente), anyLong()))
+                .thenReturn(new StripeGateway.CheckoutSessionResult("cs_test_nova", "https://checkout.stripe.com/c/cs_test_nova"));
+
+        StripeCheckoutResponse response = paymentService.createCheckoutSession(dono, 50L);
+
+        verify(stripeGateway).expireSession("cs_test_antiga");
+        assertThat(response.sessionId()).isEqualTo("cs_test_nova");
+        assertThat(paymentExistente.getStripeSessionId()).isEqualTo("cs_test_nova");
     }
 
     @Test

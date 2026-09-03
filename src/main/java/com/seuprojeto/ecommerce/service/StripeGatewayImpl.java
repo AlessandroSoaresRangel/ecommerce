@@ -13,6 +13,8 @@ import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +23,8 @@ import java.math.RoundingMode;
 
 @Component
 public class StripeGatewayImpl implements StripeGateway {
+
+    private static final Logger log = LoggerFactory.getLogger(StripeGatewayImpl.class);
 
     @Value("${stripe.secret-key}")
     private String secretKey;
@@ -76,6 +80,18 @@ public class StripeGatewayImpl implements StripeGateway {
             return new CheckoutSessionResult(session.getId(), session.getUrl());
         } catch (StripeException ex) {
             throw new PaymentGatewayException("Falha ao criar sessão de pagamento no Stripe: " + ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    public void expireSession(String sessionId) {
+        try {
+            Session.retrieve(sessionId).expire();
+        } catch (StripeException ex) {
+            // Best-effort: se a sessão já estiver completa/expirada ou a
+            // chamada falhar, apenas logamos — não é motivo para impedir a
+            // criação de uma nova sessão de checkout.
+            log.warn("Não foi possível expirar a sessão Stripe anterior {}: {}", sessionId, ex.getMessage());
         }
     }
 

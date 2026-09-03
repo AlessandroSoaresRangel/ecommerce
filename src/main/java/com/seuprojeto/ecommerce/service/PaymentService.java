@@ -47,6 +47,16 @@ public class PaymentService {
 
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseGet(() -> Payment.builder().order(order).build());
+
+        // Reemissão do checkout (retry, F5, etc.): invalida a sessão Stripe
+        // anterior antes de criar uma nova. Sem isso, a URL antiga continua
+        // pagável e, se o cliente a usasse, o webhook dela não encontraria
+        // mais o Payment (o stripeSessionId já teria sido sobrescrito) — o
+        // pedido nunca viraria PAID mesmo com o cliente cobrado.
+        if (payment.getStripeSessionId() != null) {
+            stripeGateway.expireSession(payment.getStripeSessionId());
+        }
+
         payment.setMethod(METHOD_STRIPE);
         payment.setStatus(PaymentStatus.PENDING);
         Payment saved = paymentRepository.save(payment);
