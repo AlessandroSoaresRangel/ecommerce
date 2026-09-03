@@ -81,6 +81,8 @@ class OrderServiceTest {
         assertThat(response.totalAmount()).isEqualByComparingTo("100.00");
         assertThat(response.items()).hasSize(1);
         assertThat(response.items().get(0).unitPriceAtPurchase()).isEqualByComparingTo("50.00");
+        assertThat(response.customerName()).isEqualTo("Comprador");
+        assertThat(response.customerEmail()).isEqualTo("comprador@teste.com");
 
         // Estoque debitado na mesma instância gerenciada pela transação.
         assertThat(product.getStockQuantity()).isEqualTo(3);

@@ -11,7 +11,9 @@ public record OrderResponse(
         OrderStatus status,
         BigDecimal totalAmount,
         List<Item> items,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String customerName,
+        String customerEmail
 ) {
     public record Item(
             Long productId,

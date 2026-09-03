@@ -83,7 +83,7 @@ class ProductServiceTest {
     @Test
     void createSalvaProdutoAtivoComACategoriaInformada() {
         ProductRequest request = new ProductRequest("Teclado", "Mecânico", new BigDecimal("199.90"), 20, null,
-                new BigDecimal("0.500"), 10, 10, 10, 1L);
+                new BigDecimal("0.500"), 10, 10, 10, 1L, null);
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> {
             Product p = inv.getArgument(0);
@@ -101,7 +101,7 @@ class ProductServiceTest {
     @Test
     void createLancaExcecaoQuandoCategoriaNaoExiste() {
         ProductRequest request = new ProductRequest("Teclado", "Mecânico", new BigDecimal("199.90"), 20, null,
-                new BigDecimal("0.500"), 10, 10, 10, 404L);
+                new BigDecimal("0.500"), 10, 10, 10, 404L, null);
         when(categoryRepository.findById(404L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.create(request))
@@ -111,12 +111,12 @@ class ProductServiceTest {
     }
 
     @Test
-    void updateSubstituiOsCamposDoProdutoExistente() {
+    void updateSubstituiOsCamposDoProdutoExistenteESemActiveNaoAlteraOEstadoAtual() {
         Product existente = Product.builder().id(5L).name("Antigo").description("velho")
                 .price(BigDecimal.ONE).stockQuantity(1).active(true).category(category).build();
         Category novaCategoria = Category.builder().id(2L).name("Casa").build();
         ProductRequest request = new ProductRequest("Novo Nome", "novo", new BigDecimal("50.00"), 30, "img.png",
-                new BigDecimal("0.500"), 10, 10, 10, 2L);
+                new BigDecimal("0.500"), 10, 10, 10, 2L, null);
 
         when(productRepository.findById(5L)).thenReturn(Optional.of(existente));
         when(categoryRepository.findById(2L)).thenReturn(Optional.of(novaCategoria));
@@ -127,14 +127,31 @@ class ProductServiceTest {
         assertThat(response.price()).isEqualByComparingTo("50.00");
         assertThat(response.stockQuantity()).isEqualTo(30);
         assertThat(response.categoryId()).isEqualTo(2L);
+        assertThat(response.active()).isTrue();
         // Dirty checking do JPA: não deve haver save() explícito.
         verify(productRepository, never()).save(any());
     }
 
     @Test
+    void updateComActiveTrueReativaProdutoDesativado() {
+        // Único jeito de reverter um DELETE (soft delete): PUT com active=true.
+        Product existente = Product.builder().id(5L).name("Produto").description("desc")
+                .price(BigDecimal.ONE).stockQuantity(1).active(false).category(category).build();
+        ProductRequest request = new ProductRequest("Produto", "desc", BigDecimal.ONE, 1, null,
+                new BigDecimal("0.500"), 10, 10, 10, 1L, true);
+
+        when(productRepository.findById(5L)).thenReturn(Optional.of(existente));
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+
+        ProductResponse response = productService.update(5L, request);
+
+        assertThat(response.active()).isTrue();
+    }
+
+    @Test
     void updateLancaExcecaoQuandoProdutoNaoExiste() {
         ProductRequest request = new ProductRequest("Novo Nome", "novo", new BigDecimal("50.00"), 30, null,
-                new BigDecimal("0.500"), 10, 10, 10, 1L);
+                new BigDecimal("0.500"), 10, 10, 10, 1L, null);
         when(productRepository.findById(404L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.update(404L, request))
@@ -175,6 +192,20 @@ class ProductServiceTest {
         assertThat(response.totalElements()).isEqualTo(1);
         assertThat(response.page()).isZero();
         assertThat(response.size()).isEqualTo(10);
+    }
+
+    @Test
+    void searchRepassaOFiltroIncludeInactiveParaORepositorio() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Product inativo = Product.builder().id(9L).name("Descontinuado").active(false).category(category).build();
+        when(productRepository.search(null, null, true, pageable))
+                .thenReturn(new PageImpl<>(List.of(inativo), pageable, 1));
+
+        Page<ProductResponse> response = productService.search(null, null, true, pageable);
+
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().get(0).active()).isFalse();
+        verify(productRepository).search(null, null, true, pageable);
     }
 
     @Test

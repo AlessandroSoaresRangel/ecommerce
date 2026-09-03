@@ -38,5 +38,10 @@ public record ProductRequest(
         Integer lengthCm,
 
         @NotNull(message = "A categoria é obrigatória")
-        Long categoryId
+        Long categoryId,
+
+        // Opcional: ausente/null em POST (produto sempre nasce ativo) e em PUT
+        // não altera o estado atual. É o único jeito de reativar um produto
+        // depois de um DELETE (soft delete) — não existe endpoint dedicado.
+        Boolean active
 ) {}

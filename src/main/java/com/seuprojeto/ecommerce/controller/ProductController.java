@@ -3,6 +3,8 @@ package com.seuprojeto.ecommerce.controller;
 import com.seuprojeto.ecommerce.dto.product.MostAccessedProductsResponse;
 import com.seuprojeto.ecommerce.dto.product.ProductRequest;
 import com.seuprojeto.ecommerce.dto.product.ProductResponse;
+import com.seuprojeto.ecommerce.entity.Role;
+import com.seuprojeto.ecommerce.entity.User;
 import com.seuprojeto.ecommerce.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -26,14 +29,19 @@ public class ProductController {
     @Operation(
             summary = "Listar/buscar produtos",
             description = "Retorna o catálogo de produtos de forma paginada, com filtros opcionais por " +
-                    "categoria (categoryId) e por nome (busca parcial). Endpoint público."
+                    "categoria (categoryId) e por nome (busca parcial). Endpoint público. " +
+                    "O parâmetro includeInactive só tem efeito para quem estiver autenticado com role ADMIN " +
+                    "(ignorado para todo o resto, que sempre só vê produtos ativos)."
     )
     @GetMapping
     public ResponseEntity<Page<ProductResponse>> search(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String name,
+            @RequestParam(defaultValue = "false") boolean includeInactive,
+            @AuthenticationPrincipal User requester,
             Pageable pageable) {
-        return ResponseEntity.ok(productService.search(categoryId, name, pageable));
+        boolean effectiveIncludeInactive = includeInactive && requester != null && requester.getRole() == Role.ADMIN;
+        return ResponseEntity.ok(productService.search(categoryId, name, effectiveIncludeInactive, pageable));
     }
 
     @Operation(

@@ -25,8 +25,8 @@ public class ProductService {
     private final ProductMapper productMapper;
 
     @Transactional(readOnly = true)
-    public Page<ProductResponse> search(Long categoryId, String name, Pageable pageable) {
-        return productRepository.search(categoryId, name, pageable)
+    public Page<ProductResponse> search(Long categoryId, String name, boolean includeInactive, Pageable pageable) {
+        return productRepository.search(categoryId, name, includeInactive, pageable)
                 .map(productMapper::toResponse);
     }
 
@@ -90,6 +90,9 @@ public class ProductService {
         product.setWidthCm(request.widthCm());
         product.setLengthCm(request.lengthCm());
         product.setCategory(category);
+        if (request.active() != null) {
+            product.setActive(request.active());
+        }
 
         // Não precisa de save() explícito: dentro de uma transação, o JPA
         // detecta a mudança no objeto gerenciado e sincroniza com o banco

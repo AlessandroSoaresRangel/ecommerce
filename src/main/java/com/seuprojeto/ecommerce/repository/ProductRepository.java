@@ -17,12 +17,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // com ou sem valor.
     @Query("""
         SELECT p FROM Product p
-        WHERE p.active = true
+        WHERE (:includeInactive = true OR p.active = true)
           AND (:categoryId IS NULL OR p.category.id = :categoryId)
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%')))
         """)
     Page<Product> search(@Param("categoryId") Long categoryId,
                           @Param("name") String name,
+                          @Param("includeInactive") boolean includeInactive,
                           Pageable pageable);
 
     Page<Product> findByActiveTrueOrderByAccessCountDesc(Pageable pageable);

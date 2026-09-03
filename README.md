@@ -47,6 +47,30 @@ Pré-requisitos: Java 17, Maven, um Postgres, um Redis e um Mailpit rodando (pod
 mvn spring-boot:run
 ```
 
+## Frontend (React)
+
+Um frontend React + TypeScript vive em [`frontend/`](frontend/), reaproveitando o layout de
+`Loja.dc.html`. Com a API rodando (Docker ou local):
+
+```bash
+cd frontend
+cp .env.example .env   # VITE_API_BASE_URL=http://localhost:8080
+npm install
+npm run dev             # http://localhost:5173
+```
+
+Duas coisas do backend precisam apontar para o frontend em vez do padrão (que serve páginas
+cosméticas do próprio backend, pensadas para quando não havia frontend):
+
+- **CORS**: por padrão já libera `http://localhost:5173` (`cors.allowed-origins` em
+  `application.yml`); se o frontend rodar em outra porta/origem, exporte `CORS_ALLOWED_ORIGINS`.
+- **Redirect do Stripe Checkout**: para voltar pro SPA em vez da página JSON do backend depois do
+  pagamento, exporte:
+  ```bash
+  export STRIPE_SUCCESS_URL="http://localhost:5173/checkout/success?session_id={CHECKOUT_SESSION_ID}"
+  export STRIPE_CANCEL_URL="http://localhost:5173/checkout/cancel"
+  ```
+
 ## Documentação da API (Swagger)
 
 Com a aplicação rodando, acesse:

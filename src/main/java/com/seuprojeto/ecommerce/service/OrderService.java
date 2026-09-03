@@ -149,6 +149,7 @@ public class OrderService {
                         i.getUnitPriceAtPurchase()))
                 .toList();
 
-        return new OrderResponse(order.getId(), order.getStatus(), order.getTotalAmount(), items, order.getCreatedAt());
+        return new OrderResponse(order.getId(), order.getStatus(), order.getTotalAmount(), items, order.getCreatedAt(),
+                order.getUser().getName(), order.getUser().getEmail());
     }
 }
