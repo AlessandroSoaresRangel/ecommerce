@@ -35,4 +35,7 @@ public class Payment {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    @Column(name = "stripe_session_id", length = 255, unique = true)
+    private String stripeSessionId;
 }

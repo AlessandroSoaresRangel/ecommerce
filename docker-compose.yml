@@ -52,6 +52,9 @@ services:
       REDIS_PORT: 6379
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      MELHOR_ENVIO_TOKEN: ${MELHOR_ENVIO_TOKEN:-token_sandbox_placeholder}
     ports:
       - "8080:8080"
 

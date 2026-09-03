@@ -53,7 +53,8 @@ class ProductIntegrationTest extends AbstractIntegrationTest {
     @Test
     void deveRecusarCriacaoDeProdutoSemPermissaoDeAdmin() throws Exception {
         ProductRequest request = new ProductRequest(
-                "Teclado mecânico", "Switches azuis", new BigDecimal("299.90"), 10, null, categoryId);
+                "Teclado mecânico", "Switches azuis", new BigDecimal("299.90"), 10, null,
+                new BigDecimal("0.500"), 10, 10, 10, categoryId);
 
         mockMvc.perform(post("/products")
                         .with(user("cliente@teste.com").roles("CUSTOMER"))
@@ -65,7 +66,8 @@ class ProductIntegrationTest extends AbstractIntegrationTest {
     @Test
     void deveCriarProdutoComoAdmin() throws Exception {
         ProductRequest request = new ProductRequest(
-                "Mouse gamer", "16000 DPI", new BigDecimal("199.90"), 25, null, categoryId);
+                "Mouse gamer", "16000 DPI", new BigDecimal("199.90"), 25, null,
+                new BigDecimal("0.500"), 10, 10, 10, categoryId);
 
         mockMvc.perform(post("/products")
                         .with(user("admin@teste.com").roles("ADMIN"))
@@ -79,7 +81,8 @@ class ProductIntegrationTest extends AbstractIntegrationTest {
     @Test
     void deveRetornar400QuandoPrecoForNegativo() throws Exception {
         ProductRequest request = new ProductRequest(
-                "Produto inválido", null, new BigDecimal("-10.00"), 5, null, categoryId);
+                "Produto inválido", null, new BigDecimal("-10.00"), 5, null,
+                new BigDecimal("0.500"), 10, 10, 10, categoryId);
 
         mockMvc.perform(post("/products")
                         .with(user("admin@teste.com").roles("ADMIN"))

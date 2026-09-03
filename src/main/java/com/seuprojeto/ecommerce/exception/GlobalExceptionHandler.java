@@ -52,6 +52,28 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(409, "Conflict", ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidWebhookSignatureException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidWebhookSignature(InvalidWebhookSignatureException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(400, "Bad Request", ex.getMessage()));
+    }
+
+    @ExceptionHandler(PaymentGatewayException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentGateway(PaymentGatewayException ex) {
+        log.error("Falha ao comunicar com o gateway de pagamento", ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ErrorResponse.of(502, "Bad Gateway",
+                        "Não foi possível iniciar o pagamento no momento. Tente novamente mais tarde."));
+    }
+
+    @ExceptionHandler(ShippingGatewayException.class)
+    public ResponseEntity<ErrorResponse> handleShippingGateway(ShippingGatewayException ex) {
+        log.error("Falha ao comunicar com o gateway de frete", ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ErrorResponse.of(502, "Bad Gateway",
+                        "Não foi possível calcular o frete no momento. Tente novamente mais tarde."));
+    }
+
     // Constraint do banco violada (ex.: nome único duplicado, ou FK apontando
     // para um registro que ainda tem dependentes, como categoria com produtos).
     @ExceptionHandler(DataIntegrityViolationException.class)

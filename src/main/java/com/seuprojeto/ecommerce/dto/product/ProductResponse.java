@@ -9,6 +9,10 @@ public record ProductResponse(
         BigDecimal price,
         Integer stockQuantity,
         String imageUrl,
+        BigDecimal weightKg,
+        Integer heightCm,
+        Integer widthCm,
+        Integer lengthCm,
         Boolean active,
         Long categoryId,
         String categoryName

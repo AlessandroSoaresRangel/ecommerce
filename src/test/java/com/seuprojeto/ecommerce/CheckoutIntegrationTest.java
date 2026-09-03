@@ -62,7 +62,7 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
 
     private Long createProduct(String adminToken, Long categoryId, String name, String price, int stock) throws Exception {
         String body = """
-                {"name":"%s","description":"desc","price":%s,"stockQuantity":%d,"imageUrl":null,"categoryId":%d}
+                {"name":"%s","description":"desc","price":%s,"stockQuantity":%d,"imageUrl":null,"weightKg":0.5,"heightCm":10,"widthCm":10,"lengthCm":10,"categoryId":%d}
                 """.formatted(name, price, stock, categoryId);
         MvcResult result = mockMvc.perform(post("/products")
                         .header("Authorization", "Bearer " + adminToken)

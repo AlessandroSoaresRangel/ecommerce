@@ -34,6 +34,18 @@ public class Product {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(name = "weight_kg", nullable = false, precision = 6, scale = 3)
+    private BigDecimal weightKg;
+
+    @Column(name = "height_cm", nullable = false)
+    private Integer heightCm;
+
+    @Column(name = "width_cm", nullable = false)
+    private Integer widthCm;
+
+    @Column(name = "length_cm", nullable = false)
+    private Integer lengthCm;
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;

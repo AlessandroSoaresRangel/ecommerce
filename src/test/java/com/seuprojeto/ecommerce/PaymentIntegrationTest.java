@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.seuprojeto.ecommerce.entity.Role;
 import com.seuprojeto.ecommerce.entity.User;
 import com.seuprojeto.ecommerce.repository.UserRepository;
+import com.seuprojeto.ecommerce.service.StripeGateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -18,16 +20,22 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Ponta a ponta do pagamento contra um Postgres real — cobre especificamente
- * o bug de IDOR (usuário sem relação com o pedido conseguia pagá-lo/vê-lo) e
- * a falta de validação de status (pedido já pago podia ser "pago" de novo),
- * ambos corrigidos em PaymentService.
+ * o bug de IDOR (usuário sem relação com o pedido conseguia iniciar/ver o
+ * pagamento dele), a falta de validação de status (pedido já pago podia ser
+ * "pago" de novo) e o fluxo completo Checkout Session + webhook do Stripe
+ * (mockado via StripeGateway — nenhum teste toca a rede real do Stripe).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -36,6 +44,7 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private UserRepository userRepository;
+    @MockBean private StripeGateway stripeGateway;
 
     private String registerAndGetAccessToken(String email) throws Exception {
         String body = """
@@ -65,7 +74,7 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         long categoryId = objectMapper.readTree(categoryResult.getResponse().getContentAsString()).get("id").asLong();
 
         String productBody = """
-                {"name":"Produto Pagamento","description":"desc","price":30.00,"stockQuantity":10,"imageUrl":null,"categoryId":%d}
+                {"name":"Produto Pagamento","description":"desc","price":30.00,"stockQuantity":10,"imageUrl":null,"weightKg":0.5,"heightCm":10,"widthCm":10,"lengthCm":10,"categoryId":%d}
                 """.formatted(categoryId);
         MvcResult productResult = mockMvc.perform(post("/products")
                         .header("Authorization", "Bearer " + adminToken)
@@ -103,6 +112,28 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         return objectMapper.readTree(response.body());
     }
 
+    private String stubCheckoutSession() {
+        String sessionId = "cs_test_" + UUID.randomUUID();
+        when(stripeGateway.createCheckoutSession(any(), anyLong()))
+                .thenReturn(new StripeGateway.CheckoutSessionResult(sessionId, "https://checkout.stripe.com/c/" + sessionId));
+        return sessionId;
+    }
+
+    // Simula a chamada HTTP que o Stripe faria em /webhooks/stripe após o
+    // pagamento ser concluído. O header de assinatura é um valor qualquer:
+    // StripeGateway.parseWebhookEvent está mockado, então a verificação HMAC
+    // real nunca acontece — é exatamente por isso que a interface existe.
+    private void simularWebhookConcluido(String sessionId) throws Exception {
+        when(stripeGateway.parseWebhookEvent(anyString(), anyString()))
+                .thenReturn(new StripeGateway.WebhookEventResult(
+                        "checkout.session.completed", sessionId, "pi_test_" + UUID.randomUUID()));
+
+        mockMvc.perform(post("/webhooks/stripe")
+                        .header("Stripe-Signature", "t=1,v1=fake-signature-bypassed-by-mock")
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void donoConseguePagarOProprioPedidoEEleMudaParaPagoENotificaPorEmail() throws Exception {
         String adminToken = registerAndGetAccessToken("admin-pag1@teste.com");
@@ -111,14 +142,17 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         String donoToken = registerAndGetAccessToken(donoEmail);
         long orderId = criarPedidoPendente(adminToken, donoToken, "1-" + System.nanoTime());
 
-        String payBody = """
-                {"method":"PIX"}
-                """;
-        mockMvc.perform(post("/orders/" + orderId + "/payment")
-                        .header("Authorization", "Bearer " + donoToken)
-                        .contentType("application/json").content(payBody))
+        String sessionId = stubCheckoutSession();
+        mockMvc.perform(post("/orders/" + orderId + "/payment").header("Authorization", "Bearer " + donoToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("APPROVED"));
+                .andExpect(jsonPath("$.sessionId").value(sessionId))
+                .andExpect(jsonPath("$.checkoutUrl").value("https://checkout.stripe.com/c/" + sessionId));
+
+        // Antes do webhook, o pedido continua PENDING.
+        mockMvc.perform(get("/orders/" + orderId).header("Authorization", "Bearer " + donoToken))
+                .andExpect(jsonPath("$.status").value("PENDING"));
+
+        simularWebhookConcluido(sessionId);
 
         mockMvc.perform(get("/orders/" + orderId).header("Authorization", "Bearer " + donoToken))
                 .andExpect(jsonPath("$.status").value("PAID"));
@@ -136,13 +170,8 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         long orderId = criarPedidoPendente(adminToken, donoToken, "2-" + System.nanoTime());
 
         String estranhoToken = registerAndGetAccessToken("estranho-pag2@teste.com");
-        String payBody = """
-                {"method":"PIX"}
-                """;
 
-        mockMvc.perform(post("/orders/" + orderId + "/payment")
-                        .header("Authorization", "Bearer " + estranhoToken)
-                        .contentType("application/json").content(payBody))
+        mockMvc.perform(post("/orders/" + orderId + "/payment").header("Authorization", "Bearer " + estranhoToken))
                 .andExpect(status().isNotFound());
 
         // O pedido continua PENDING: a tentativa indevida não teve efeito.
@@ -157,17 +186,12 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         String donoToken = registerAndGetAccessToken("dono-pag3@teste.com");
         long orderId = criarPedidoPendente(adminToken, donoToken, "3-" + System.nanoTime());
 
-        String payBody = """
-                {"method":"PIX"}
-                """;
-        mockMvc.perform(post("/orders/" + orderId + "/payment")
-                        .header("Authorization", "Bearer " + donoToken)
-                        .contentType("application/json").content(payBody))
+        String sessionId = stubCheckoutSession();
+        mockMvc.perform(post("/orders/" + orderId + "/payment").header("Authorization", "Bearer " + donoToken))
                 .andExpect(status().isOk());
+        simularWebhookConcluido(sessionId);
 
-        mockMvc.perform(post("/orders/" + orderId + "/payment")
-                        .header("Authorization", "Bearer " + donoToken)
-                        .contentType("application/json").content(payBody))
+        mockMvc.perform(post("/orders/" + orderId + "/payment").header("Authorization", "Bearer " + donoToken))
                 .andExpect(status().isConflict());
     }
 
@@ -178,16 +202,13 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         String donoToken = registerAndGetAccessToken("dono-pag4@teste.com");
         long orderId = criarPedidoPendente(adminToken, donoToken, "4-" + System.nanoTime());
 
-        String payBody = """
-                {"method":"PIX"}
-                """;
-        MvcResult payResult = mockMvc.perform(post("/orders/" + orderId + "/payment")
-                        .header("Authorization", "Bearer " + donoToken)
-                        .contentType("application/json").content(payBody))
+        stubCheckoutSession();
+        MvcResult checkoutResult = mockMvc.perform(post("/orders/" + orderId + "/payment")
+                        .header("Authorization", "Bearer " + donoToken))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode payment = objectMapper.readTree(payResult.getResponse().getContentAsString());
-        long paymentId = payment.get("id").asLong();
+        JsonNode checkout = objectMapper.readTree(checkoutResult.getResponse().getContentAsString());
+        long paymentId = checkout.get("paymentId").asLong();
 
         mockMvc.perform(get("/payments/" + paymentId).header("Authorization", "Bearer " + donoToken))
                 .andExpect(status().isOk());

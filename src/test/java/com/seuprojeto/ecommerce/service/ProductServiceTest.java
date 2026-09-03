@@ -54,7 +54,8 @@ class ProductServiceTest {
             Long categoryId = p.getCategory() != null ? p.getCategory().getId() : null;
             String categoryName = p.getCategory() != null ? p.getCategory().getName() : null;
             return new ProductResponse(p.getId(), p.getName(), p.getDescription(), p.getPrice(),
-                    p.getStockQuantity(), p.getImageUrl(), p.getActive(), categoryId, categoryName);
+                    p.getStockQuantity(), p.getImageUrl(), p.getWeightKg(), p.getHeightCm(), p.getWidthCm(),
+                    p.getLengthCm(), p.getActive(), categoryId, categoryName);
         });
     }
 
@@ -81,7 +82,8 @@ class ProductServiceTest {
 
     @Test
     void createSalvaProdutoAtivoComACategoriaInformada() {
-        ProductRequest request = new ProductRequest("Teclado", "Mecânico", new BigDecimal("199.90"), 20, null, 1L);
+        ProductRequest request = new ProductRequest("Teclado", "Mecânico", new BigDecimal("199.90"), 20, null,
+                new BigDecimal("0.500"), 10, 10, 10, 1L);
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> {
             Product p = inv.getArgument(0);
@@ -98,7 +100,8 @@ class ProductServiceTest {
 
     @Test
     void createLancaExcecaoQuandoCategoriaNaoExiste() {
-        ProductRequest request = new ProductRequest("Teclado", "Mecânico", new BigDecimal("199.90"), 20, null, 404L);
+        ProductRequest request = new ProductRequest("Teclado", "Mecânico", new BigDecimal("199.90"), 20, null,
+                new BigDecimal("0.500"), 10, 10, 10, 404L);
         when(categoryRepository.findById(404L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.create(request))
@@ -112,7 +115,8 @@ class ProductServiceTest {
         Product existente = Product.builder().id(5L).name("Antigo").description("velho")
                 .price(BigDecimal.ONE).stockQuantity(1).active(true).category(category).build();
         Category novaCategoria = Category.builder().id(2L).name("Casa").build();
-        ProductRequest request = new ProductRequest("Novo Nome", "novo", new BigDecimal("50.00"), 30, "img.png", 2L);
+        ProductRequest request = new ProductRequest("Novo Nome", "novo", new BigDecimal("50.00"), 30, "img.png",
+                new BigDecimal("0.500"), 10, 10, 10, 2L);
 
         when(productRepository.findById(5L)).thenReturn(Optional.of(existente));
         when(categoryRepository.findById(2L)).thenReturn(Optional.of(novaCategoria));
@@ -129,7 +133,8 @@ class ProductServiceTest {
 
     @Test
     void updateLancaExcecaoQuandoProdutoNaoExiste() {
-        ProductRequest request = new ProductRequest("Novo Nome", "novo", new BigDecimal("50.00"), 30, null, 1L);
+        ProductRequest request = new ProductRequest("Novo Nome", "novo", new BigDecimal("50.00"), 30, null,
+                new BigDecimal("0.500"), 10, 10, 10, 1L);
         when(productRepository.findById(404L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.update(404L, request))

@@ -54,6 +54,8 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/products/**", "/categories/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/webhooks/stripe").permitAll()
+                .requestMatchers(HttpMethod.GET, "/checkout/success", "/checkout/cancel").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

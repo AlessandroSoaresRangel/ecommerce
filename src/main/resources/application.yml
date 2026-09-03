@@ -54,6 +54,20 @@ app:
   mail:
     from: ${MAIL_FROM:naoresponda@ecommerce.com}
 
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  success-url: ${STRIPE_SUCCESS_URL:http://localhost:8080/checkout/success?session_id={CHECKOUT_SESSION_ID}}
+  cancel-url: ${STRIPE_CANCEL_URL:http://localhost:8080/checkout/cancel}
+  currency: ${STRIPE_CURRENCY:brl}
+
+shipping:
+  melhor-envio:
+    base-url: ${MELHOR_ENVIO_BASE_URL:https://sandbox.melhorenvio.com.br}
+    token: ${MELHOR_ENVIO_TOKEN:token_sandbox_placeholder}
+    from-cep: ${MELHOR_ENVIO_FROM_CEP:01310-100}
+    user-agent: ${MELHOR_ENVIO_USER_AGENT:ecommerce-api (naoresponda@ecommerce.com)}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

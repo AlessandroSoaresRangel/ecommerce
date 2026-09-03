@@ -64,6 +64,10 @@ public class ProductService {
                 .price(request.price())
                 .stockQuantity(request.stockQuantity())
                 .imageUrl(request.imageUrl())
+                .weightKg(request.weightKg())
+                .heightCm(request.heightCm())
+                .widthCm(request.widthCm())
+                .lengthCm(request.lengthCm())
                 .category(category)
                 .active(true)
                 .build();
@@ -81,6 +85,10 @@ public class ProductService {
         product.setPrice(request.price());
         product.setStockQuantity(request.stockQuantity());
         product.setImageUrl(request.imageUrl());
+        product.setWeightKg(request.weightKg());
+        product.setHeightCm(request.heightCm());
+        product.setWidthCm(request.widthCm());
+        product.setLengthCm(request.lengthCm());
         product.setCategory(category);
 
         // Não precisa de save() explícito: dentro de uma transação, o JPA

@@ -1,12 +1,11 @@
 package com.seuprojeto.ecommerce.controller;
 
-import com.seuprojeto.ecommerce.dto.payment.PaymentRequest;
 import com.seuprojeto.ecommerce.dto.payment.PaymentResponse;
+import com.seuprojeto.ecommerce.dto.payment.StripeCheckoutResponse;
 import com.seuprojeto.ecommerce.entity.User;
 import com.seuprojeto.ecommerce.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -19,16 +18,15 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @Operation(
-            summary = "Pagar pedido",
-            description = "Simula o pagamento de um pedido existente: registra o método de pagamento e, " +
-                    "se aprovado, marca o pedido como PAID. Requer autenticação; só o dono do pedido ou um " +
-                    "ADMIN podem pagá-lo, e o pedido precisa estar com status PENDING."
+            summary = "Iniciar pagamento do pedido (Stripe Checkout)",
+            description = "Cria uma Stripe Checkout Session (modo teste) para um pedido existente e devolve a URL " +
+                    "de pagamento hospedada pela Stripe. O pedido só é marcado como PAID quando o Stripe confirma " +
+                    "o pagamento via webhook. Requer autenticação; só o dono do pedido ou um ADMIN podem iniciar o " +
+                    "pagamento, e o pedido precisa estar com status PENDING."
     )
     @PostMapping("/orders/{orderId}/payment")
-    public PaymentResponse pay(@AuthenticationPrincipal User user,
-                                @PathVariable Long orderId,
-                                @Valid @RequestBody PaymentRequest request) {
-        return paymentService.pay(user, orderId, request);
+    public StripeCheckoutResponse createCheckout(@AuthenticationPrincipal User user, @PathVariable Long orderId) {
+        return paymentService.createCheckoutSession(user, orderId);
     }
 
     @Operation(

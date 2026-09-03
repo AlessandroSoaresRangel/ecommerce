@@ -70,6 +70,24 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void assinaturaDeWebhookInvalidaVira400() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleInvalidWebhookSignature(new InvalidWebhookSignatureException("assinatura inválida"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void falhaNoGatewayDePagamentoVira502ESemVazarDetalheInterno() {
+        ResponseEntity<ErrorResponse> response = handler.handlePaymentGateway(
+                new PaymentGatewayException("erro interno do SDK Stripe", new RuntimeException("causa")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(response.getBody().message())
+                .isEqualTo("Não foi possível iniciar o pagamento no momento. Tente novamente mais tarde.");
+    }
+
+    @Test
     void violacaoDeIntegridadeDoBancoVira409EmVezDe500() {
         ResponseEntity<ErrorResponse> response = handler.handleDataIntegrityViolation(
                 new DataIntegrityViolationException("duplicate key value"));

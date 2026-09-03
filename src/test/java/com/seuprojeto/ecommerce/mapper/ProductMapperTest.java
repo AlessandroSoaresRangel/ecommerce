@@ -29,6 +29,10 @@ class ProductMapperTest {
                 .price(new BigDecimal("199.90"))
                 .stockQuantity(25)
                 .imageUrl("mouse.png")
+                .weightKg(new BigDecimal("0.500"))
+                .heightCm(5)
+                .widthCm(12)
+                .lengthCm(10)
                 .active(true)
                 .category(category)
                 .build();
@@ -39,6 +43,10 @@ class ProductMapperTest {
         assertThat(response.name()).isEqualTo("Mouse gamer");
         assertThat(response.price()).isEqualByComparingTo("199.90");
         assertThat(response.stockQuantity()).isEqualTo(25);
+        assertThat(response.weightKg()).isEqualByComparingTo("0.500");
+        assertThat(response.heightCm()).isEqualTo(5);
+        assertThat(response.widthCm()).isEqualTo(12);
+        assertThat(response.lengthCm()).isEqualTo(10);
         assertThat(response.active()).isTrue();
         assertThat(response.categoryId()).isEqualTo(1L);
         assertThat(response.categoryName()).isEqualTo("Eletrônicos");

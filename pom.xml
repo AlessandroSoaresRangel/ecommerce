@@ -58,6 +58,13 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- Stripe (pagamento, modo teste) -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <version>29.2.0</version>
+        </dependency>
+
         <!-- Banco de dados -->
         <dependency>
             <groupId>org.postgresql</groupId>

@@ -100,7 +100,7 @@ class CategoryIntegrationTest extends AbstractIntegrationTest {
         long categoryId = objectMapper.readTree(categoryResult.getResponse().getContentAsString()).get("id").asLong();
 
         String productBody = """
-                {"name":"Produto Vinculado","description":"desc","price":10.00,"stockQuantity":1,"imageUrl":null,"categoryId":%d}
+                {"name":"Produto Vinculado","description":"desc","price":10.00,"stockQuantity":1,"imageUrl":null,"weightKg":0.5,"heightCm":10,"widthCm":10,"lengthCm":10,"categoryId":%d}
                 """.formatted(categoryId);
         mockMvc.perform(post("/products")
                         .header("Authorization", "Bearer " + adminToken)
