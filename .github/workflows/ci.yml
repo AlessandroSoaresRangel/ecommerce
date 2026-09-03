@@ -19,12 +19,14 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+          cache-dependency-path: backend/pom.xml
 
       # ubuntu-latest já tem Docker disponível nativamente, então os testes
       # de integração (Testcontainers: Postgres + Redis) rodam sem
       # configuração extra — diferente da fricção que existe em alguns
       # setups de Docker Desktop no Windows.
       - name: Rodar testes (unitários + integração)
+        working-directory: backend
         run: mvn -B test
 
       - name: Publicar relatórios de teste em caso de falha
@@ -32,4 +34,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: surefire-reports
-          path: target/surefire-reports/
+          path: backend/target/surefire-reports/

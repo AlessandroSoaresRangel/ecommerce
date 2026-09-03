@@ -44,6 +44,7 @@ A API sobe em `http://localhost:8080`. Os e-mails "enviados" (mudança de status
 Pré-requisitos: Java 17, Maven, um Postgres, um Redis e um Mailpit rodando (pode usar só esses três serviços do docker-compose: `docker compose up postgres redis mailpit`).
 
 ```bash
+cd backend
 mvn spring-boot:run
 ```
 
@@ -123,7 +124,7 @@ O comando imprime um `whsec_...` — exporte como `STRIPE_WEBHOOK_SECRET`. Deixe
 ```bash
 export STRIPE_SECRET_KEY=sk_test_...
 export STRIPE_WEBHOOK_SECRET=whsec_...
-mvn spring-boot:run
+cd backend && mvn spring-boot:run
 ```
 
 (ou passe as mesmas variáveis para `docker compose up`)
@@ -146,7 +147,7 @@ Crie uma conta no [sandbox do Melhor Envio](https://sandbox.melhorenvio.com.br) 
 
 ```bash
 export MELHOR_ENVIO_TOKEN=seu_token_sandbox
-mvn spring-boot:run
+cd backend && mvn spring-boot:run
 ```
 
 (ou passe a mesma variável para `docker compose up`)
@@ -160,6 +161,7 @@ Sem o token configurado, o endpoint continua funcionando na estrutura, mas a cha
 ## Rodando os testes
 
 ```bash
+cd backend
 mvn test
 ```
 
@@ -198,8 +200,17 @@ Todo push e pull request roda a suíte completa de testes (unitários + integra�
 
 ## Estrutura do projeto
 
+O repositório é um monorepo com o backend e o frontend em pastas separadas:
+
 ```
-src/main/java/com/seuprojeto/ecommerce/
+.
+├── backend/         → API Spring Boot (Java 17)
+├── frontend/        → SPA React + TypeScript (ver frontend/README ou seção "Frontend (React)" acima)
+└── docker-compose.yml → orquestra Postgres, Redis, Mailpit e a API
+```
+
+```
+backend/src/main/java/com/seuprojeto/ecommerce/
 ├── config/          → SecurityConfig, CacheConfig
 ├── controller/      → REST controllers
 ├── dto/             → request/response DTOs, organizados por módulo

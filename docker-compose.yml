@@ -35,7 +35,7 @@ services:
       - "8025:8025" # UI web (ver os e-mails "enviados")
 
   app:
-    build: .
+    build: ./backend
     container_name: ecommerce-app
     depends_on:
       postgres:
