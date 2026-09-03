@@ -106,7 +106,7 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
 
         // Preço muda depois da compra: o pedido já feito não deve refletir isso.
         String updateBody = """
-                {"name":"Produto Checkout","description":"desc","price":999.99,"stockQuantity":7,"imageUrl":null,"categoryId":%d}
+                {"name":"Produto Checkout","description":"desc","price":999.99,"stockQuantity":7,"imageUrl":null,"weightKg":0.5,"heightCm":10,"widthCm":10,"lengthCm":10,"categoryId":%d}
                 """.formatted(categoryId);
         mockMvc.perform(put("/products/" + productId)
                         .header("Authorization", "Bearer " + adminToken)
