@@ -35,7 +35,7 @@ public class OrderController {
     )
     @PostMapping("/orders")
     public ResponseEntity<OrderResponse> checkout(@AuthenticationPrincipal User user,
-                                                   @RequestBody(required = false) CheckoutRequest request) {
+                                                   @Valid @RequestBody(required = false) CheckoutRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(orderService.checkout(user, request));
     }
 

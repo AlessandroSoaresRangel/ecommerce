@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "../services/client";
 import * as ordersApi from "../services/orders";
@@ -20,6 +20,18 @@ export function CartPage() {
   const [shipIdx, setShipIdx] = useState<number | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
+
+  // O frete cotado depende do peso/dimensões dos itens do carrinho: se a
+  // quantidade mudar ou um item for removido/adicionado depois da cotação,
+  // a opção selecionada não corresponde mais ao carrinho atual. Descartamos
+  // a cotação para não mostrar um total que o checkout não vai cobrar.
+  const cartSignature = cart?.items.map((i) => `${i.id}:${i.quantity}`).join(",") ?? "";
+  useEffect(() => {
+    setOptions(null);
+    setShipIdx(null);
+    setShipError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartSignature]);
 
   if (!cart) return null;
 

@@ -20,42 +20,33 @@ public class CartController {
 
     private final CartService cartService;
 
-    @Operation(
-            summary = "Ver carrinho",
-            description = "Retorna o carrinho do usuário autenticado, com os itens atuais e o total. " +
-                    "Requer autenticação."
-    )
+    @Operation(summary = "Ver carrinho", description = "Retorna o carrinho do usuário autenticado, com os itens atuais e o total. "
+            +
+            "Requer autenticação.")
     @GetMapping
     public CartResponse getCart(@AuthenticationPrincipal User user) {
         return cartService.getCart(user);
     }
 
-    @Operation(
-            summary = "Adicionar item ao carrinho",
-            description = "Adiciona um produto ao carrinho do usuário autenticado. Se o produto já estiver " +
-                    "no carrinho, a quantidade é somada. Requer autenticação."
-    )
+    @Operation(summary = "Adicionar item ao carrinho", description = "Adiciona um produto ao carrinho do usuário autenticado. Se o produto já estiver "
+            +
+            "no carrinho, a quantidade é somada. Requer autenticação.")
     @PostMapping("/items")
     public CartResponse addItem(@AuthenticationPrincipal User user, @Valid @RequestBody CartItemRequest request) {
         return cartService.addItem(user, request);
     }
 
-    @Operation(
-            summary = "Atualizar quantidade de um item",
-            description = "Altera a quantidade de um item já existente no carrinho do usuário autenticado. " +
-                    "Requer autenticação."
-    )
+    @Operation(summary = "Atualizar quantidade de um item", description = "Altera a quantidade de um item já existente no carrinho do usuário autenticado. "
+            +
+            "Requer autenticação.")
     @PutMapping("/items/{itemId}")
     public CartResponse updateItem(@AuthenticationPrincipal User user,
-                                    @PathVariable Long itemId,
-                                    @RequestParam @Min(1) int quantity) {
+            @PathVariable Long itemId,
+            @RequestParam @Min(1) int quantity) {
         return cartService.updateItemQuantity(user, itemId, quantity);
     }
 
-    @Operation(
-            summary = "Remover item do carrinho",
-            description = "Remove um item do carrinho do usuário autenticado. Requer autenticação."
-    )
+    @Operation(summary = "Remover item do carrinho", description = "Remove um item do carrinho do usuário autenticado. Requer autenticação.")
     @DeleteMapping("/items/{itemId}")
     public CartResponse removeItem(@AuthenticationPrincipal User user, @PathVariable Long itemId) {
         return cartService.removeItem(user, itemId);
