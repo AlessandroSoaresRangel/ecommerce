@@ -32,6 +32,7 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final EmailService emailService;
     private final StripeGateway stripeGateway;
+    private final OrderService orderService;
 
     @Transactional
     public StripeCheckoutResponse createCheckoutSession(User requester, Long orderId) {
@@ -49,12 +50,18 @@ public class PaymentService {
                 .orElseGet(() -> Payment.builder().order(order).build());
 
         // Reemissão do checkout (retry, F5, etc.): invalida a sessão Stripe
-        // anterior antes de criar uma nova. Sem isso, a URL antiga continua
-        // pagável e, se o cliente a usasse, o webhook dela não encontraria
-        // mais o Payment (o stripeSessionId já teria sido sobrescrito) — o
-        // pedido nunca viraria PAID mesmo com o cliente cobrado.
-        if (payment.getStripeSessionId() != null) {
-            stripeGateway.expireSession(payment.getStripeSessionId());
+        // anterior. Sem isso, a URL antiga continua pagável e, se o cliente a
+        // usasse, o webhook dela não encontraria mais o Payment (o
+        // stripeSessionId já teria sido sobrescrito) — o pedido nunca viraria
+        // PAID mesmo com o cliente cobrado.
+        //
+        // A expiração só roda depois do commit: ela dispara o webhook
+        // checkout.session.expired da sessão antiga, e se ele chegasse antes do
+        // commit ainda encontraria o Payment apontando para essa sessão —
+        // cancelando o pedido que o cliente está justamente tentando pagar.
+        String previousSessionId = payment.getStripeSessionId();
+        if (previousSessionId != null) {
+            AfterCommit.run(() -> stripeGateway.expireSession(previousSessionId));
         }
 
         payment.setMethod(METHOD_STRIPE);
@@ -95,6 +102,15 @@ public class PaymentService {
             paymentRepository.save(payment);
 
             Order order = payment.getOrder();
+            // Só um pedido PENDING vira PAID. Se ele foi cancelado enquanto a
+            // sessão ainda estava aberta, o estoque já foi devolvido: marcá-lo
+            // como PAID venderia itens que não estão mais reservados. O
+            // pagamento fica registrado como APPROVED para estorno manual.
+            if (order.getStatus() != OrderStatus.PENDING) {
+                log.error("Pagamento {} aprovado para o pedido {} com status {} — requer estorno manual",
+                        payment.getId(), order.getId(), order.getStatus());
+                return;
+            }
             OrderStatus previousStatus = order.getStatus();
             order.setStatus(OrderStatus.PAID);
             emailService.sendOrderStatusChangedEmail(order, previousStatus);
@@ -107,6 +123,17 @@ public class PaymentService {
             if (payment.getStatus() == PaymentStatus.APPROVED) return;
             payment.setStatus(PaymentStatus.REJECTED);
             paymentRepository.save(payment);
+
+            // Só cancela pedidos ainda aguardando pagamento: um pedido que o
+            // admin já marcou como PAID/SHIPPED (ex.: pago por fora) não deve
+            // ser cancelado nem ter o estoque devolvido por uma sessão expirada.
+            Order order = payment.getOrder();
+            if (order != null && order.getStatus() == OrderStatus.PENDING) {
+                OrderStatus previousStatus = order.getStatus();
+                order.setStatus(OrderStatus.CANCELED);
+                orderService.restoreStock(order);
+                emailService.sendOrderStatusChangedEmail(order, previousStatus);
+            }
         });
     }
 

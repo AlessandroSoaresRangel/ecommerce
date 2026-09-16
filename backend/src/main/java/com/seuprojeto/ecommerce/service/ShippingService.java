@@ -29,14 +29,17 @@ public class ShippingService {
         }
 
         List<ShippingGateway.ShippingItem> items = cart.getItems().stream()
-                .map(i -> new ShippingGateway.ShippingItem(
-                        i.getProduct().getId().toString(),
-                        i.getProduct().getWeightKg(),
-                        i.getProduct().getHeightCm(),
-                        i.getProduct().getWidthCm(),
-                        i.getProduct().getLengthCm(),
-                        i.getProduct().getPrice(),
-                        i.getQuantity()))
+                .map(i -> {
+                    var p = i.getProduct();
+                    return new ShippingGateway.ShippingItem(
+                            p.getId().toString(),
+                            p.getWeightKg() != null ? p.getWeightKg() : java.math.BigDecimal.ZERO,
+                            p.getHeightCm() != null ? p.getHeightCm() : 1,
+                            p.getWidthCm() != null ? p.getWidthCm() : 1,
+                            p.getLengthCm() != null ? p.getLengthCm() : 1,
+                            p.getPrice(),
+                            i.getQuantity());
+                })
                 .toList();
 
         return shippingGateway.calculateShipping(request.destinationCep(), items).stream()

@@ -10,11 +10,13 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/cart")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Carrinho")
 public class CartController {
 

@@ -1,10 +1,13 @@
 package com.seuprojeto.ecommerce.controller;
 
 import com.seuprojeto.ecommerce.entity.Category;
+import com.seuprojeto.ecommerce.exception.CategoryInUseException;
 import com.seuprojeto.ecommerce.exception.ResourceNotFoundException;
 import com.seuprojeto.ecommerce.repository.CategoryRepository;
+import com.seuprojeto.ecommerce.repository.ProductRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +24,7 @@ import java.util.List;
 public class CategoryController {
 
     private final CategoryRepository categoryRepository;
+    private final ProductRepository productRepository;
 
     public record CategoryRequest(@NotBlank String name, String description) {}
 
@@ -39,7 +43,7 @@ public class CategoryController {
     )
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Category> create(@RequestBody CategoryRequest request) {
+    public ResponseEntity<Category> create(@Valid @RequestBody CategoryRequest request) {
         Category category = Category.builder()
                 .name(request.name())
                 .description(request.description())
@@ -50,13 +54,16 @@ public class CategoryController {
     @Operation(
             summary = "Remover categoria",
             description = "Remove uma categoria existente. Restrito a usuários com role ADMIN. " +
-                    "Falha com 404 se a categoria não existir."
+                    "Falha com 404 se a categoria não existir, ou 409 se ainda houver produtos vinculados a ela."
     )
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (!categoryRepository.existsById(id)) {
             throw new ResourceNotFoundException("Categoria não encontrada: id " + id);
+        }
+        if (productRepository.existsByCategoryId(id)) {
+            throw new CategoryInUseException(id);
         }
         categoryRepository.deleteById(id);
         return ResponseEntity.noContent().build();

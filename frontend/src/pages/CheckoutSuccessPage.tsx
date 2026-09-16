@@ -22,12 +22,17 @@ export function CheckoutSuccessPage() {
 
   const [order, setOrder] = useState<OrderResponse | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [orderIdMissing, setOrderIdMissing] = useState(false);
   const attempts = useRef(0);
 
   useEffect(() => {
+    // sessionStorage é por aba: se o Stripe redirecionar para uma aba/navegador
+    // diferente do que iniciou o checkout (ex.: o cliente troca de dispositivo
+    // ou abre o link recebido por e-mail), essa chave não existe aqui. Isso não
+    // significa que o pagamento falhou — só que não sabemos qual pedido rastrear.
     const orderId = sessionStorage.getItem(PENDING_ORDER_KEY);
     if (!orderId) {
-      setTimedOut(true);
+      setOrderIdMissing(true);
       return;
     }
 
@@ -69,6 +74,18 @@ export function CheckoutSuccessPage() {
             </p>
             <button className="btn btn-primary mt-4" onClick={() => navigate(`/orders/${order.id}`)}>
               Ver pedido
+            </button>
+          </>
+        ) : orderIdMissing ? (
+          <>
+            <h4 className="mb-2">Não foi possível identificar o pedido automaticamente</h4>
+            <p className="text-[13px] text-muted">
+              Isso acontece quando este link é aberto em uma aba ou navegador diferente do que iniciou o
+              checkout. O pagamento pode ter sido concluído normalmente — confira a lista de pedidos para ver o
+              status atualizado.
+            </p>
+            <button className="btn btn-secondary mt-4" onClick={() => navigate("/orders")}>
+              Ver meus pedidos
             </button>
           </>
         ) : timedOut ? (

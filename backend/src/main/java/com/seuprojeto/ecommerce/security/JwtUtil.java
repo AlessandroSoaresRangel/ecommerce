@@ -8,11 +8,16 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.function.Function;
 
 @Component
 public class JwtUtil {
+
+    public static final String CLAIM_TOKEN_TYPE = "type";
+    public static final String TYPE_ACCESS = "ACCESS";
+    public static final String TYPE_REFRESH = "REFRESH";
 
     @Value("${jwt.secret}")
     private String secret;
@@ -24,21 +29,22 @@ public class JwtUtil {
     private long refreshExpirationMs;
 
     private SecretKey signingKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes());
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(UserDetails userDetails) {
-        return buildToken(userDetails, expirationMs);
+        return buildToken(userDetails, expirationMs, TYPE_ACCESS);
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(userDetails, refreshExpirationMs);
+        return buildToken(userDetails, refreshExpirationMs, TYPE_REFRESH);
     }
 
-    private String buildToken(UserDetails userDetails, long ttlMs) {
+    private String buildToken(UserDetails userDetails, long ttlMs, String tokenType) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(userDetails.getUsername())
+                .claim(CLAIM_TOKEN_TYPE, tokenType)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + ttlMs))
                 .signWith(signingKey())
@@ -47,6 +53,15 @@ public class JwtUtil {
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    public String extractTokenType(String token) {
+        return extractClaim(token, claims -> claims.get(CLAIM_TOKEN_TYPE, String.class));
+    }
+
+    public boolean isTokenType(String token, String expectedType) {
+        String type = extractTokenType(token);
+        return expectedType.equals(type);
     }
 
     // A expiração já é validada pelo próprio parser do jjwt dentro de

@@ -74,7 +74,8 @@ public class AuthService {
             User user = userRepository.findByEmail(username)
                     .orElseThrow(() -> new IllegalStateException("Usuário não encontrado"));
 
-            if (!jwtUtil.isTokenValid(request.refreshToken(), user)) {
+            if (!jwtUtil.isTokenValid(request.refreshToken(), user)
+                    || !jwtUtil.isTokenType(request.refreshToken(), JwtUtil.TYPE_REFRESH)) {
                 throw new BadCredentialsException("Refresh token inválido ou expirado");
             }
 

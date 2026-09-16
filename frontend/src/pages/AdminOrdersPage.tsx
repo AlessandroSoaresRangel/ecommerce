@@ -9,6 +9,16 @@ import { formatDateTime, formatMoney } from "../utils/format";
 const PAGE_SIZE = 10;
 const STATUSES: OrderStatus[] = ["PENDING", "PAID", "SHIPPED", "CANCELED"];
 
+// Espelha as regras de OrderService.updateStatus: pedido cancelado é final,
+// nada volta para PENDING e pedido enviado não volta para PAID.
+function isTransitionAllowed(from: OrderStatus, to: OrderStatus): boolean {
+  if (from === to) return true;
+  if (from === "CANCELED") return false;
+  if (to === "PENDING") return false;
+  if (from === "SHIPPED" && to === "PAID") return false;
+  return true;
+}
+
 export function AdminOrdersPage() {
   const { reportError, notify } = useFeedback();
 
@@ -88,7 +98,7 @@ export function AdminOrdersPage() {
                             type="radio"
                             name={`st${o.id}`}
                             checked={o.status === s}
-                            disabled={updatingId === o.id}
+                            disabled={updatingId === o.id || !isTransitionAllowed(o.status, s)}
                             onChange={() => handleStatusChange(o, s)}
                           />
                           <span>{s}</span>

@@ -1,5 +1,6 @@
 package com.seuprojeto.ecommerce.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,6 +14,7 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,6 +38,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InsufficientStockException.class)
     public ResponseEntity<ErrorResponse> handleInsufficientStock(InsufficientStockException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.of(409, "Conflict", ex.getMessage()));
+    }
+
+    @ExceptionHandler(CategoryInUseException.class)
+    public ResponseEntity<ErrorResponse> handleCategoryInUse(CategoryInUseException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ErrorResponse.of(409, "Conflict", ex.getMessage()));
     }
@@ -117,6 +125,28 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.ofValidation(400, "Bad Request", "Erro de validação", fieldErrors));
+    }
+
+    // Violação de constraint em parâmetro de rota/query (ex.: @Min(1) em
+    // PUT /cart/items/{id}?quantity=0). Com @Validated na classe o Spring
+    // lança ConstraintViolationException; a validação nativa do MVC (6.1+)
+    // lança HandlerMethodValidationException. Ambos são erro do cliente.
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getConstraintViolations().forEach(v -> {
+            String path = v.getPropertyPath().toString();
+            fieldErrors.put(path.substring(path.lastIndexOf('.') + 1), v.getMessage());
+        });
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.ofValidation(400, "Bad Request", "Erro de validação", fieldErrors));
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponse> handleHandlerMethodValidation(HandlerMethodValidationException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(400, "Bad Request", "Erro de validação"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

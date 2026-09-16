@@ -32,8 +32,12 @@ public class ProductService {
 
     @Transactional
     public ProductResponse findById(Long id) {
-        Product product = findEntityById(id);
+        // O incremento vem ANTES da leitura: incrementAccessCount usa
+        // clearAutomatically, que desanexa as entidades do persistence context.
+        // Se o produto fosse carregado antes, a categoria (LAZY) viraria um proxy
+        // desanexado e o mapper lançaria LazyInitializationException.
         productRepository.incrementAccessCount(id);
+        Product product = findEntityById(id);
         return productMapper.toResponse(product);
     }
 

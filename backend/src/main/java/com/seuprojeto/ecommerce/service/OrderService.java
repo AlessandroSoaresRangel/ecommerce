@@ -5,10 +5,12 @@ import com.seuprojeto.ecommerce.dto.order.OrderResponse;
 import com.seuprojeto.ecommerce.entity.*;
 import com.seuprojeto.ecommerce.exception.EmptyCartException;
 import com.seuprojeto.ecommerce.exception.InsufficientStockException;
+import com.seuprojeto.ecommerce.exception.InvalidOrderStatusException;
 import com.seuprojeto.ecommerce.exception.ResourceNotFoundException;
 import com.seuprojeto.ecommerce.exception.ShippingOptionUnavailableException;
 import com.seuprojeto.ecommerce.repository.CartItemRepository;
 import com.seuprojeto.ecommerce.repository.OrderRepository;
+import com.seuprojeto.ecommerce.repository.PaymentRepository;
 import com.seuprojeto.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,6 +31,8 @@ public class OrderService {
     private final CartService cartService;
     private final EmailService emailService;
     private final ShippingGateway shippingGateway;
+    private final PaymentRepository paymentRepository;
+    private final StripeGateway stripeGateway;
 
     /**
      * Cria o pedido a partir do carrinho do usuário.
@@ -37,9 +41,10 @@ public class OrderService {
      * debita a quantidade de cada produto, grava o pedido com o preço
      * "congelado" no momento da compra, e esvazia o carrinho. Se
      * qualquer passo falhar (estoque insuficiente, ou um conflito de
+     * 
      * @Version porque outro pedido mexeu no mesmo produto ao mesmo
-     * tempo), a transação inteira é revertida — nunca fica um pedido
-     * "pela metade" ou estoque debitado sem pedido correspondente.
+     *          tempo), a transação inteira é revertida — nunca fica um pedido
+     *          "pela metade" ou estoque debitado sem pedido correspondente.
      */
     @Transactional
     public OrderResponse checkout(User user, CheckoutRequest shippingRequest) {
@@ -137,13 +142,58 @@ public class OrderService {
     public OrderResponse updateStatus(Long id, OrderStatus newStatus) {
         Order order = findEntity(id);
         OrderStatus previousStatus = order.getStatus();
-        order.setStatus(newStatus);
 
-        if (previousStatus != newStatus) {
-            emailService.sendOrderStatusChangedEmail(order, previousStatus);
+        if (previousStatus == newStatus) {
+            return toResponse(order);
         }
 
+        if (previousStatus == OrderStatus.CANCELED) {
+            throw new InvalidOrderStatusException("Pedido cancelado não pode ter seu status alterado.");
+        }
+
+        // Voltar para PENDING reabriria o pagamento (createCheckoutSession só
+        // aceita pedidos PENDING), permitindo cobrar duas vezes um pedido pago.
+        if (newStatus == OrderStatus.PENDING) {
+            throw new InvalidOrderStatusException("Pedido não pode retroceder para PENDING a partir de " + previousStatus);
+        }
+
+        if (previousStatus == OrderStatus.SHIPPED && newStatus == OrderStatus.PAID) {
+            throw new InvalidOrderStatusException("Pedido já enviado não pode retroceder para " + newStatus);
+        }
+
+        if (newStatus == OrderStatus.CANCELED) {
+            restoreStock(order);
+            expirePendingPaymentSessionAfterCommit(order);
+        }
+
+        order.setStatus(newStatus);
+        emailService.sendOrderStatusChangedEmail(order, previousStatus);
+
         return toResponse(order);
+    }
+
+    /**
+     * Um pedido cancelado não pode continuar pagável: sem isso, a URL do Stripe
+     * emitida antes do cancelamento continuaria válida e o cliente poderia pagar
+     * um pedido cujo estoque já foi devolvido. A expiração roda só depois do
+     * commit — o webhook checkout.session.expired que ela dispara então já
+     * encontra o pedido CANCELED e não devolve o estoque uma segunda vez.
+     */
+    private void expirePendingPaymentSessionAfterCommit(Order order) {
+        paymentRepository.findByOrderId(order.getId())
+                .filter(p -> p.getStatus() == PaymentStatus.PENDING && p.getStripeSessionId() != null)
+                .map(Payment::getStripeSessionId)
+                .ifPresent(sessionId -> AfterCommit.run(() -> stripeGateway.expireSession(sessionId)));
+    }
+
+    public void restoreStock(Order order) {
+        for (OrderItem item : order.getItems()) {
+            Product product = productRepository.findById(item.getProduct().getId()).orElse(null);
+            if (product != null) {
+                int current = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                product.setStockQuantity(current + item.getQuantity());
+            }
+        }
     }
 
     /**
@@ -153,14 +203,17 @@ public class OrderService {
      */
     private BigDecimal resolveShippingCost(Cart cart, CheckoutRequest shippingRequest) {
         List<ShippingGateway.ShippingItem> items = cart.getItems().stream()
-                .map(i -> new ShippingGateway.ShippingItem(
-                        i.getProduct().getId().toString(),
-                        i.getProduct().getWeightKg(),
-                        i.getProduct().getHeightCm(),
-                        i.getProduct().getWidthCm(),
-                        i.getProduct().getLengthCm(),
-                        i.getProduct().getPrice(),
-                        i.getQuantity()))
+                .map(i -> {
+                    var p = i.getProduct();
+                    return new ShippingGateway.ShippingItem(
+                            p.getId().toString(),
+                            p.getWeightKg() != null ? p.getWeightKg() : BigDecimal.ZERO,
+                            p.getHeightCm() != null ? p.getHeightCm() : 1,
+                            p.getWidthCm() != null ? p.getWidthCm() : 1,
+                            p.getLengthCm() != null ? p.getLengthCm() : 1,
+                            p.getPrice(),
+                            i.getQuantity());
+                })
                 .toList();
 
         return shippingGateway.calculateShipping(shippingRequest.destinationCep(), items).stream()

@@ -127,6 +127,7 @@ class AuthServiceTest {
         when(jwtUtil.extractUsername("refresh-valido")).thenReturn("user@teste.com");
         when(userRepository.findByEmail("user@teste.com")).thenReturn(Optional.of(user));
         when(jwtUtil.isTokenValid(eq("refresh-valido"), any(UserDetails.class))).thenReturn(true);
+        when(jwtUtil.isTokenType("refresh-valido", JwtUtil.TYPE_REFRESH)).thenReturn(true);
         when(jwtUtil.generateToken(any(UserDetails.class))).thenReturn("novo-access-token");
         when(jwtUtil.generateRefreshToken(any(UserDetails.class))).thenReturn("novo-refresh-token");
 
@@ -144,6 +145,20 @@ class AuthServiceTest {
         when(jwtUtil.extractUsername("refresh-invalido")).thenReturn("user@teste.com");
         when(userRepository.findByEmail("user@teste.com")).thenReturn(Optional.of(user));
         when(jwtUtil.isTokenValid(eq("refresh-invalido"), any(UserDetails.class))).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.refresh(request))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void refreshDeveRecusarAccessTokenUsadoComoRefresh() {
+        RefreshTokenRequest request = new RefreshTokenRequest("access-token-como-refresh");
+        User user = User.builder().id(1L).email("user@teste.com").role(Role.CUSTOMER).build();
+
+        when(jwtUtil.extractUsername("access-token-como-refresh")).thenReturn("user@teste.com");
+        when(userRepository.findByEmail("user@teste.com")).thenReturn(Optional.of(user));
+        when(jwtUtil.isTokenValid(eq("access-token-como-refresh"), any(UserDetails.class))).thenReturn(true);
+        when(jwtUtil.isTokenType("access-token-como-refresh", JwtUtil.TYPE_REFRESH)).thenReturn(false);
 
         assertThatThrownBy(() -> authService.refresh(request))
                 .isInstanceOf(BadCredentialsException.class);

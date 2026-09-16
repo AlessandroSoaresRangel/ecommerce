@@ -131,13 +131,52 @@ class CheckoutIntegrationTest extends AbstractIntegrationTest {
         String adminToken = registerAndGetAccessToken("admin-checkout2@teste.com");
         promoteToAdmin("admin-checkout2@teste.com");
         Long categoryId = createCategory(adminToken, "Categoria-Checkout2-" + System.nanoTime());
-        Long productId = createProduct(adminToken, categoryId, "Produto Escasso", "10.00", 1);
+        Long productId = createProduct(adminToken, categoryId, "Produto Escasso", "10.00", 5);
 
         String buyerToken = registerAndGetAccessToken("comprador-checkout2@teste.com");
         addToCart(buyerToken, productId, 5);
 
+        // O carrinho já recusa quantidades acima do estoque, então o cenário
+        // real é o estoque cair DEPOIS de o item estar no carrinho (outra
+        // venda, ajuste do admin): o checkout precisa revalidar.
+        String reduceStockBody = """
+                {"name":"Produto Escasso","description":"desc","price":10.00,"stockQuantity":1,"imageUrl":null,"weightKg":0.5,"heightCm":10,"widthCm":10,"lengthCm":10,"categoryId":%d}
+                """.formatted(categoryId);
+        mockMvc.perform(put("/products/" + productId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType("application/json").content(reduceStockBody))
+                .andExpect(status().isOk());
+
         mockMvc.perform(post("/orders").header("Authorization", "Bearer " + buyerToken))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void carrinhoRecusaQuantidadeAcimaDoEstoqueEQuantidadeZero() throws Exception {
+        String adminToken = registerAndGetAccessToken("admin-checkout5@teste.com");
+        promoteToAdmin("admin-checkout5@teste.com");
+        Long categoryId = createCategory(adminToken, "Categoria-Checkout5-" + System.nanoTime());
+        Long productId = createProduct(adminToken, categoryId, "Produto Limitado", "10.00", 2);
+
+        String buyerToken = registerAndGetAccessToken("comprador-checkout5@teste.com");
+        String body = """
+                {"productId":%d,"quantity":3}
+                """.formatted(productId);
+        mockMvc.perform(post("/cart/items")
+                        .header("Authorization", "Bearer " + buyerToken)
+                        .contentType("application/json").content(body))
+                .andExpect(status().isConflict());
+
+        addToCart(buyerToken, productId, 1);
+        MvcResult cartResult = mockMvc.perform(get("/cart").header("Authorization", "Bearer " + buyerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        long itemId = objectMapper.readTree(cartResult.getResponse().getContentAsString())
+                .get("items").get(0).get("id").asLong();
+
+        mockMvc.perform(put("/cart/items/" + itemId).param("quantity", "0")
+                        .header("Authorization", "Bearer " + buyerToken))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

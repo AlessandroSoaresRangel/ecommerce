@@ -6,6 +6,7 @@ import com.seuprojeto.ecommerce.entity.Cart;
 import com.seuprojeto.ecommerce.entity.CartItem;
 import com.seuprojeto.ecommerce.entity.Product;
 import com.seuprojeto.ecommerce.entity.User;
+import com.seuprojeto.ecommerce.exception.InsufficientStockException;
 import com.seuprojeto.ecommerce.exception.ResourceNotFoundException;
 import com.seuprojeto.ecommerce.repository.CartItemRepository;
 import com.seuprojeto.ecommerce.repository.CartRepository;
@@ -36,14 +37,23 @@ public class CartService {
         Product product = productRepository.findById(request.productId())
                 .orElseThrow(() -> new ResourceNotFoundException("Produto não encontrado: id " + request.productId()));
 
+        if (!Boolean.TRUE.equals(product.getActive())) {
+            throw new ResourceNotFoundException("Produto não está disponível: id " + product.getId());
+        }
+
         CartItem item = cartItemRepository.findByCartIdAndProductId(cart.getId(), product.getId())
                 .orElse(null);
+
+        int targetQuantity = (item == null ? 0 : item.getQuantity()) + request.quantity();
+        if (product.getStockQuantity() != null && product.getStockQuantity() < targetQuantity) {
+            throw new InsufficientStockException(product.getName(), product.getStockQuantity(), targetQuantity);
+        }
 
         if (item == null) {
             item = CartItem.builder().cart(cart).product(product).quantity(request.quantity()).build();
             cart.getItems().add(item);
         } else {
-            item.setQuantity(item.getQuantity() + request.quantity());
+            item.setQuantity(targetQuantity);
         }
 
         cartItemRepository.save(item);
@@ -52,8 +62,15 @@ public class CartService {
 
     @Transactional
     public CartResponse updateItemQuantity(User user, Long itemId, int quantity) {
+        if (quantity < 1) {
+            throw new IllegalArgumentException("A quantidade deve ser no mínimo 1");
+        }
         Cart cart = findOrCreateCart(user);
         CartItem item = findItemInCart(cart, itemId);
+        if (item.getProduct().getStockQuantity() != null && item.getProduct().getStockQuantity() < quantity) {
+            throw new InsufficientStockException(item.getProduct().getName(), item.getProduct().getStockQuantity(),
+                    quantity);
+        }
         item.setQuantity(quantity);
         return toResponse(cart);
     }
@@ -87,8 +104,7 @@ public class CartService {
                         i.getProduct().getName(),
                         i.getProduct().getPrice(),
                         i.getQuantity(),
-                        i.getProduct().getPrice().multiply(BigDecimal.valueOf(i.getQuantity()))
-                ))
+                        i.getProduct().getPrice().multiply(BigDecimal.valueOf(i.getQuantity()))))
                 .toList();
 
         BigDecimal total = items.stream()

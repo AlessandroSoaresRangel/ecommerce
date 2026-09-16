@@ -54,7 +54,7 @@ export function ProductDetailPage() {
   const specs: [string, string][] = [
     ["id", String(product.id)],
     ["categoryId", String(product.categoryId)],
-    ["weightKg", product.weightKg.toFixed(3)],
+    ["weightKg", Number(product.weightKg || 0).toFixed(3)],
     ["dimensões (A×L×C)", `${product.heightCm} × ${product.widthCm} × ${product.lengthCm} cm`],
     ["active", String(product.active)],
   ];
@@ -93,7 +93,7 @@ export function ProductDetailPage() {
               <span className="flex items-center justify-center font-heading text-[16px]" style={{ width: 44 }}>
                 {qty}
               </span>
-              <button className="btn btn-ghost" style={{ border: 0, width: 38 }} onClick={() => setQty((q) => q + 1)}>
+              <button className="btn btn-ghost" style={{ border: 0, width: 38 }} onClick={() => setQty((q) => Math.min(Math.max(1, product.stockQuantity), q + 1))}>
                 +
               </button>
             </div>

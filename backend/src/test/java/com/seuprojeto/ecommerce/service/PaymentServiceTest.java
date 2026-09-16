@@ -34,6 +34,7 @@ class PaymentServiceTest {
     @Mock private OrderRepository orderRepository;
     @Mock private EmailService emailService;
     @Mock private StripeGateway stripeGateway;
+    @Mock private OrderService orderService;
 
     private PaymentService paymentService;
 
@@ -44,7 +45,7 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        paymentService = new PaymentService(paymentRepository, orderRepository, emailService, stripeGateway);
+        paymentService = new PaymentService(paymentRepository, orderRepository, emailService, stripeGateway, orderService);
 
         dono = User.builder().id(1L).role(Role.CUSTOMER).build();
         estranho = User.builder().id(2L).role(Role.CUSTOMER).build();
@@ -152,7 +153,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    void webhookSessaoExpiradaRejeitaPagamento() {
+    void webhookSessaoExpiradaRejeitaPagamentoCancelaPedidoEDevolveEstoque() {
         Payment payment = Payment.builder().id(1L).order(pedidoPendente)
                 .method("STRIPE").status(PaymentStatus.PENDING).stripeSessionId("cs_test_123").build();
         when(paymentRepository.findByStripeSessionId("cs_test_123")).thenReturn(Optional.of(payment));
@@ -162,7 +163,40 @@ class PaymentServiceTest {
                 new StripeGateway.WebhookEventResult("checkout.session.expired", "cs_test_123", null));
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REJECTED);
-        assertThat(pedidoPendente.getStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(pedidoPendente.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        verify(orderService).restoreStock(pedidoPendente);
+        verify(emailService).sendOrderStatusChangedEmail(pedidoPendente, OrderStatus.PENDING);
+    }
+
+    @Test
+    void webhookSessaoExpiradaNaoCancelaPedidoQueOAdminJaMarcouComoEnviado() {
+        pedidoPendente.setStatus(OrderStatus.SHIPPED);
+        Payment payment = Payment.builder().id(1L).order(pedidoPendente)
+                .method("STRIPE").status(PaymentStatus.PENDING).stripeSessionId("cs_test_123").build();
+        when(paymentRepository.findByStripeSessionId("cs_test_123")).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.handleWebhookEvent(
+                new StripeGateway.WebhookEventResult("checkout.session.expired", "cs_test_123", null));
+
+        assertThat(pedidoPendente.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        verifyNoInteractions(orderService, emailService);
+    }
+
+    @Test
+    void webhookPagamentoConcluidoNaoRessuscitaPedidoCancelado() {
+        pedidoPendente.setStatus(OrderStatus.CANCELED);
+        Payment payment = Payment.builder().id(1L).order(pedidoPendente)
+                .method("STRIPE").status(PaymentStatus.PENDING).stripeSessionId("cs_test_123").build();
+        when(paymentRepository.findByStripeSessionId("cs_test_123")).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.handleWebhookEvent(
+                new StripeGateway.WebhookEventResult("checkout.session.completed", "cs_test_123", "pi_test_456"));
+
+        // O pagamento fica registrado (para estorno), mas o pedido continua cancelado.
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+        assertThat(pedidoPendente.getStatus()).isEqualTo(OrderStatus.CANCELED);
         verifyNoInteractions(emailService);
     }
 

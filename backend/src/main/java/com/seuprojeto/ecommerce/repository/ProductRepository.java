@@ -28,10 +28,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Page<Product> findByActiveTrueOrderByAccessCountDesc(Pageable pageable);
 
+    boolean existsByCategoryId(Long categoryId);
+
     // Incremento atômico em uma única instrução SQL: evita perder contagens
     // sob concorrência (duas visualizações simultâneas não se sobrescrevem
     // como aconteceria com um read-then-write via entidade gerenciada).
-    @Modifying
+    // clearAutomatically limpa o persistence context depois do UPDATE, senão
+    // uma leitura subsequente na mesma transação devolveria o accessCount
+    // desatualizado (cacheado antes do incremento).
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE Product p SET p.accessCount = p.accessCount + 1 WHERE p.id = :id")
     void incrementAccessCount(@Param("id") Long id);
 }

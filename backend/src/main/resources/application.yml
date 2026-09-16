@@ -60,8 +60,8 @@ app:
 stripe:
   secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
-  success-url: ${STRIPE_SUCCESS_URL:http://localhost:8080/checkout/success?session_id={CHECKOUT_SESSION_ID}}
-  cancel-url: ${STRIPE_CANCEL_URL:http://localhost:8080/checkout/cancel}
+  success-url: ${STRIPE_SUCCESS_URL:http://localhost:5173/checkout/success?session_id={CHECKOUT_SESSION_ID}}
+  cancel-url: ${STRIPE_CANCEL_URL:http://localhost:5173/checkout/cancel}
   currency: ${STRIPE_CURRENCY:brl}
 
 shipping:

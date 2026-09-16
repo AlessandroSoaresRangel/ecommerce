@@ -5,10 +5,12 @@ import com.seuprojeto.ecommerce.dto.order.OrderResponse;
 import com.seuprojeto.ecommerce.entity.*;
 import com.seuprojeto.ecommerce.exception.EmptyCartException;
 import com.seuprojeto.ecommerce.exception.InsufficientStockException;
+import com.seuprojeto.ecommerce.exception.InvalidOrderStatusException;
 import com.seuprojeto.ecommerce.exception.ResourceNotFoundException;
 import com.seuprojeto.ecommerce.exception.ShippingOptionUnavailableException;
 import com.seuprojeto.ecommerce.repository.CartItemRepository;
 import com.seuprojeto.ecommerce.repository.OrderRepository;
+import com.seuprojeto.ecommerce.repository.PaymentRepository;
 import com.seuprojeto.ecommerce.repository.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,8 @@ class OrderServiceTest {
     @Mock private CartService cartService;
     @Mock private EmailService emailService;
     @Mock private ShippingGateway shippingGateway;
+    @Mock private PaymentRepository paymentRepository;
+    @Mock private StripeGateway stripeGateway;
 
     private OrderService orderService;
 
@@ -53,7 +57,8 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartService, emailService, shippingGateway);
+        orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartService,
+                emailService, shippingGateway, paymentRepository, stripeGateway);
 
         user = User.builder().id(1L).name("Comprador").email("comprador@teste.com").role(Role.CUSTOMER).build();
         product = Product.builder()
@@ -284,6 +289,53 @@ class OrderServiceTest {
         orderService.updateStatus(5L, OrderStatus.PENDING);
 
         verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void cancelarPedidoDevolveOEstoqueEExpiraASessaoDePagamentoAberta() {
+        Order order = Order.builder().id(5L).user(user).status(OrderStatus.PENDING)
+                .totalAmount(new BigDecimal("100.00")).build();
+        order.getItems().add(OrderItem.builder().order(order).product(product).quantity(2)
+                .unitPriceAtPurchase(product.getPrice()).build());
+        Payment payment = Payment.builder().id(1L).order(order).status(PaymentStatus.PENDING)
+                .stripeSessionId("cs_test_aberta").build();
+
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(paymentRepository.findByOrderId(5L)).thenReturn(Optional.of(payment));
+
+        orderService.updateStatus(5L, OrderStatus.CANCELED);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        // 5 em estoque + 2 devolvidos do pedido cancelado.
+        assertThat(product.getStockQuantity()).isEqualTo(7);
+        verify(stripeGateway).expireSession("cs_test_aberta");
+        verify(emailService).sendOrderStatusChangedEmail(order, OrderStatus.PENDING);
+    }
+
+    @Test
+    void naoPermiteVoltarPedidoPagoParaPendente() {
+        Order order = Order.builder().id(5L).user(user).status(OrderStatus.PAID)
+                .totalAmount(BigDecimal.TEN).build();
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateStatus(5L, OrderStatus.PENDING))
+                .isInstanceOf(InvalidOrderStatusException.class);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void naoPermiteAlterarStatusDePedidoCancelado() {
+        Order order = Order.builder().id(5L).user(user).status(OrderStatus.CANCELED)
+                .totalAmount(BigDecimal.TEN).build();
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateStatus(5L, OrderStatus.PAID))
+                .isInstanceOf(InvalidOrderStatusException.class);
+
+        verifyNoInteractions(emailService, productRepository);
     }
 
     @Test
