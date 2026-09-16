@@ -61,6 +61,14 @@ export function OrderDetailPage() {
         <aside className="blueprint p-6">
           <Corners />
           <h4 className="mb-4">Total</h4>
+          {order.shippingCost > 0 && (
+            <div className="mb-2 flex justify-between text-[12px] text-muted">
+              <span>
+                Frete {order.shippingCarrierName ? `(${order.shippingCarrierName} · ${order.shippingServiceName})` : ""}
+              </span>
+              <span className="font-mono">{formatMoney(order.shippingCost)}</span>
+            </div>
+          )}
           <div className="mb-4 font-heading text-[30px]">{formatMoney(order.totalAmount)}</div>
           <p className="m-0 text-[12px] text-muted">
             O preço unitário fica travado no momento da compra: alterar o produto depois não muda este histórico.

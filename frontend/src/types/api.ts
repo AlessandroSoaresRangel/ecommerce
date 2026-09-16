@@ -128,6 +128,9 @@ export interface OrderResponse {
   id: number;
   status: OrderStatus;
   totalAmount: number;
+  shippingCost: number;
+  shippingCarrierName: string | null;
+  shippingServiceName: string | null;
   items: OrderItemResponse[];
   createdAt: string;
   customerName: string;
@@ -135,6 +138,11 @@ export interface OrderResponse {
 }
 export interface OrderStatusUpdateRequest {
   status: OrderStatus;
+}
+export interface CheckoutRequest {
+  destinationCep: string;
+  carrierName: string;
+  serviceName: string;
 }
 
 // ---- payments ----

@@ -1,10 +1,12 @@
 package com.seuprojeto.ecommerce.service;
 
+import com.seuprojeto.ecommerce.dto.order.CheckoutRequest;
 import com.seuprojeto.ecommerce.dto.order.OrderResponse;
 import com.seuprojeto.ecommerce.entity.*;
 import com.seuprojeto.ecommerce.exception.EmptyCartException;
 import com.seuprojeto.ecommerce.exception.InsufficientStockException;
 import com.seuprojeto.ecommerce.exception.ResourceNotFoundException;
+import com.seuprojeto.ecommerce.exception.ShippingOptionUnavailableException;
 import com.seuprojeto.ecommerce.repository.CartItemRepository;
 import com.seuprojeto.ecommerce.repository.OrderRepository;
 import com.seuprojeto.ecommerce.repository.ProductRepository;
@@ -25,7 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -42,6 +44,7 @@ class OrderServiceTest {
     @Mock private CartItemRepository cartItemRepository;
     @Mock private CartService cartService;
     @Mock private EmailService emailService;
+    @Mock private ShippingGateway shippingGateway;
 
     private OrderService orderService;
 
@@ -50,12 +53,14 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartService, emailService);
+        orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartService, emailService, shippingGateway);
 
         user = User.builder().id(1L).name("Comprador").email("comprador@teste.com").role(Role.CUSTOMER).build();
         product = Product.builder()
                 .id(10L).name("Produto X").price(new BigDecimal("50.00"))
-                .stockQuantity(5).active(true).build();
+                .stockQuantity(5).active(true)
+                .weightKg(new BigDecimal("0.700")).heightCm(8).widthCm(15).lengthCm(20)
+                .build();
     }
 
     private Cart cartWith(CartItem... items) {
@@ -75,7 +80,7 @@ class OrderServiceTest {
             return order;
         });
 
-        OrderResponse response = orderService.checkout(user);
+        OrderResponse response = orderService.checkout(user, null);
 
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING);
         assertThat(response.totalAmount()).isEqualByComparingTo("100.00");
@@ -101,7 +106,7 @@ class OrderServiceTest {
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        OrderResponse response = orderService.checkout(user);
+        OrderResponse response = orderService.checkout(user, null);
         BigDecimal precoNoMomentoDaCompra = response.items().get(0).unitPriceAtPurchase();
 
         product.setPrice(new BigDecimal("999.99"));
@@ -110,10 +115,48 @@ class OrderServiceTest {
     }
 
     @Test
+    void deveSomarOFreteRecotadoAoTotalDoPedidoQuandoSelecionado() {
+        CartItem item = CartItem.builder().id(1L).product(product).quantity(2).build();
+        Cart cart = cartWith(item);
+
+        when(cartService.findOrCreateCart(user)).thenReturn(cart);
+        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(shippingGateway.calculateShipping(eq("01310-100"), anyList()))
+                .thenReturn(List.of(new ShippingGateway.ShippingQuoteResult("Correios", "PAC", new BigDecimal("15.50"), 9)));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CheckoutRequest request = new CheckoutRequest("01310-100", "Correios", "PAC");
+        OrderResponse response = orderService.checkout(user, request);
+
+        assertThat(response.shippingCost()).isEqualByComparingTo("15.50");
+        assertThat(response.shippingCarrierName()).isEqualTo("Correios");
+        assertThat(response.shippingServiceName()).isEqualTo("PAC");
+        // 2 x 50.00 (itens) + 15.50 (frete) = 115.50
+        assertThat(response.totalAmount()).isEqualByComparingTo("115.50");
+    }
+
+    @Test
+    void deveRecusarCheckoutQuandoOpcaoDeFreteSelecionadaNaoEstaMaisDisponivel() {
+        CartItem item = CartItem.builder().id(1L).product(product).quantity(1).build();
+        Cart cart = cartWith(item);
+
+        when(cartService.findOrCreateCart(user)).thenReturn(cart);
+        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(shippingGateway.calculateShipping(eq("01310-100"), anyList())).thenReturn(List.of());
+
+        CheckoutRequest request = new CheckoutRequest("01310-100", "Correios", "PAC");
+
+        assertThatThrownBy(() -> orderService.checkout(user, request))
+                .isInstanceOf(ShippingOptionUnavailableException.class);
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
     void deveRecusarCheckoutComCarrinhoVazio() {
         when(cartService.findOrCreateCart(user)).thenReturn(cartWith());
 
-        assertThatThrownBy(() -> orderService.checkout(user))
+        assertThatThrownBy(() -> orderService.checkout(user, null))
                 .isInstanceOf(EmptyCartException.class);
 
         verifyNoInteractions(orderRepository, productRepository, cartItemRepository);
@@ -128,7 +171,7 @@ class OrderServiceTest {
         when(cartService.findOrCreateCart(user)).thenReturn(cart);
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
 
-        assertThatThrownBy(() -> orderService.checkout(user))
+        assertThatThrownBy(() -> orderService.checkout(user, null))
                 .isInstanceOf(InsufficientStockException.class);
 
         // Nada deve ser gravado se o estoque não fecha.
@@ -145,7 +188,7 @@ class OrderServiceTest {
         when(cartService.findOrCreateCart(user)).thenReturn(cart);
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
 
-        assertThatThrownBy(() -> orderService.checkout(user))
+        assertThatThrownBy(() -> orderService.checkout(user, null))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(orderRepository, never()).save(any());

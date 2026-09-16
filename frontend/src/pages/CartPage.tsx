@@ -48,7 +48,12 @@ export function CartPage() {
   async function handleCheckout() {
     setCheckingOut(true);
     try {
-      const order = await ordersApi.checkout();
+      const selected = options && shipIdx != null ? options[shipIdx] : null;
+      const order = await ordersApi.checkout(
+        selected
+          ? { destinationCep: cep, carrierName: selected.carrierName, serviceName: selected.serviceName }
+          : undefined
+      );
       await refresh();
       notify("Pedido criado. Prossiga para o pagamento.");
       navigate(`/checkout/${order.id}`);
@@ -60,6 +65,7 @@ export function CartPage() {
   }
 
   const shipCost = options && shipIdx != null ? options[shipIdx].price : 0;
+  const orderTotal = cart.totalAmount + shipCost;
 
   return (
     <div>
@@ -156,8 +162,8 @@ export function CartPage() {
                 </button>
               </div>
               <p className="mb-4 font-mono text-[11.5px] text-muted">
-                calculado a partir do peso e das dimensões dos itens · não faz parte do total do pedido — o
-                checkout sempre cobra só os itens
+                calculado a partir do peso e das dimensões dos itens · selecione uma opção para somá-la ao total
+                do pedido
               </p>
 
               {options && options.length > 0 && (
@@ -207,15 +213,15 @@ export function CartPage() {
               <div style={{ height: 1, background: "var(--color-divider)" }} />
               <div className="flex items-baseline justify-between">
                 <span className="font-heading text-[17px]">Total do pedido</span>
-                <span className="font-heading text-[26px]">{formatMoney(cart.totalAmount)}</span>
+                <span className="font-heading text-[26px]">{formatMoney(orderTotal)}</span>
               </div>
             </div>
             <button className="btn btn-primary btn-block mt-6" onClick={handleCheckout} disabled={checkingOut}>
               Fechar pedido
             </button>
             <p className="m-0 mt-3 text-[11px] text-muted">
-              Verifica e debita o estoque, congela o preço de compra e esvazia o carrinho numa única transação. O
-              frete não entra no total — é só uma estimativa de custo de envio.
+              Verifica e debita o estoque, congela o preço de compra e esvazia o carrinho numa única transação. Se
+              um frete estiver selecionado, seu valor é recotado no servidor e somado ao total cobrado.
             </p>
           </aside>
         </div>

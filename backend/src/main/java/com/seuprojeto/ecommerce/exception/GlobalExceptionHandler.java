@@ -46,6 +46,12 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(400, "Bad Request", ex.getMessage()));
     }
 
+    @ExceptionHandler(ShippingOptionUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleShippingOptionUnavailable(ShippingOptionUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(400, "Bad Request", ex.getMessage()));
+    }
+
     @ExceptionHandler(InvalidOrderStatusException.class)
     public ResponseEntity<ErrorResponse> handleInvalidOrderStatus(InvalidOrderStatusException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

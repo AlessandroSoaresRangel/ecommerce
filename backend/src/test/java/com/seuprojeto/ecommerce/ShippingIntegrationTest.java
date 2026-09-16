@@ -112,6 +112,47 @@ class ShippingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void checkoutSomaOFreteSelecionadoAoTotalDoPedido() throws Exception {
+        String adminToken = registerAndGetAccessToken("admin-frete4@teste.com");
+        promoteToAdmin("admin-frete4@teste.com");
+        String buyerToken = registerAndGetAccessToken("comprador-frete4@teste.com");
+        adicionarProdutoAoCarrinho(adminToken, buyerToken, "4-" + System.nanoTime());
+
+        when(shippingGateway.calculateShipping(anyString(), any()))
+                .thenReturn(List.of(new ShippingGateway.ShippingQuoteResult("Correios", "PAC", new BigDecimal("37.79"), 9)));
+
+        // 2 unidades do Produto Frete a 49.90 = 99.80 + 37.79 de frete = 137.59
+        String checkoutBody = """
+                {"destinationCep":"20040-020","carrierName":"Correios","serviceName":"PAC"}
+                """;
+        mockMvc.perform(post("/orders")
+                        .header("Authorization", "Bearer " + buyerToken)
+                        .contentType("application/json").content(checkoutBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shippingCost").value(37.79))
+                .andExpect(jsonPath("$.shippingCarrierName").value("Correios"))
+                .andExpect(jsonPath("$.totalAmount").value(137.59));
+    }
+
+    @Test
+    void checkoutRejeitaOpcaoDeFreteQueNaoEstaMaisDisponivel() throws Exception {
+        String adminToken = registerAndGetAccessToken("admin-frete5@teste.com");
+        promoteToAdmin("admin-frete5@teste.com");
+        String buyerToken = registerAndGetAccessToken("comprador-frete5@teste.com");
+        adicionarProdutoAoCarrinho(adminToken, buyerToken, "5-" + System.nanoTime());
+
+        when(shippingGateway.calculateShipping(anyString(), any())).thenReturn(List.of());
+
+        String checkoutBody = """
+                {"destinationCep":"20040-020","carrierName":"Correios","serviceName":"PAC"}
+                """;
+        mockMvc.perform(post("/orders")
+                        .header("Authorization", "Bearer " + buyerToken)
+                        .contentType("application/json").content(checkoutBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void rejeitaCepInvalido() throws Exception {
         String token = registerAndGetAccessToken("comprador-frete2@teste.com");
 

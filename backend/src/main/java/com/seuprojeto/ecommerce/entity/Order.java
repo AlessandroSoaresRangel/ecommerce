@@ -33,6 +33,16 @@ public class Order {
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "shipping_cost", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal shippingCost = BigDecimal.ZERO;
+
+    @Column(name = "shipping_carrier_name", length = 100)
+    private String shippingCarrierName;
+
+    @Column(name = "shipping_service_name", length = 100)
+    private String shippingServiceName;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();

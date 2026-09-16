@@ -1,5 +1,6 @@
 package com.seuprojeto.ecommerce.controller;
 
+import com.seuprojeto.ecommerce.dto.order.CheckoutRequest;
 import com.seuprojeto.ecommerce.dto.order.OrderResponse;
 import com.seuprojeto.ecommerce.dto.order.OrderStatusUpdateRequest;
 import com.seuprojeto.ecommerce.entity.User;
@@ -27,12 +28,15 @@ public class OrderController {
             summary = "Fechar pedido (checkout)",
             description = "Cria um pedido a partir do carrinho do usuário autenticado: verifica e debita o " +
                     "estoque de cada produto, congela o preço de compra e esvazia o carrinho. Tudo em uma " +
-                    "única transação. Falha com 400 se o carrinho estiver vazio, ou 409 se não houver estoque " +
+                    "única transação. Se destinationCep/carrierName/serviceName forem informados, o frete é " +
+                    "recotado no gateway e somado ao total do pedido. Falha com 400 se o carrinho estiver " +
+                    "vazio ou a opção de frete não estiver mais disponível, ou 409 se não houver estoque " +
                     "suficiente ou houver conflito de concorrência em algum produto."
     )
     @PostMapping("/orders")
-    public ResponseEntity<OrderResponse> checkout(@AuthenticationPrincipal User user) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.checkout(user));
+    public ResponseEntity<OrderResponse> checkout(@AuthenticationPrincipal User user,
+                                                   @RequestBody(required = false) CheckoutRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.checkout(user, request));
     }
 
     @Operation(

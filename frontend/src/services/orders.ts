@@ -1,8 +1,8 @@
 import { request } from "./client";
-import type { OrderResponse, OrderStatus, SpringPage } from "../types/api";
+import type { CheckoutRequest, OrderResponse, OrderStatus, SpringPage } from "../types/api";
 
-export function checkout(): Promise<OrderResponse> {
-  return request<OrderResponse>("/orders", { method: "POST" });
+export function checkout(shipping?: CheckoutRequest): Promise<OrderResponse> {
+  return request<OrderResponse>("/orders", { method: "POST", body: shipping });
 }
 
 export function myOrders(page = 0, size = 20): Promise<SpringPage<OrderResponse>> {

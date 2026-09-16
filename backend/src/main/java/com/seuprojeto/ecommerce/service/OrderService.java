@@ -1,10 +1,12 @@
 package com.seuprojeto.ecommerce.service;
 
+import com.seuprojeto.ecommerce.dto.order.CheckoutRequest;
 import com.seuprojeto.ecommerce.dto.order.OrderResponse;
 import com.seuprojeto.ecommerce.entity.*;
 import com.seuprojeto.ecommerce.exception.EmptyCartException;
 import com.seuprojeto.ecommerce.exception.InsufficientStockException;
 import com.seuprojeto.ecommerce.exception.ResourceNotFoundException;
+import com.seuprojeto.ecommerce.exception.ShippingOptionUnavailableException;
 import com.seuprojeto.ecommerce.repository.CartItemRepository;
 import com.seuprojeto.ecommerce.repository.OrderRepository;
 import com.seuprojeto.ecommerce.repository.ProductRepository;
@@ -26,6 +28,7 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final CartService cartService;
     private final EmailService emailService;
+    private final ShippingGateway shippingGateway;
 
     /**
      * Cria o pedido a partir do carrinho do usuário.
@@ -39,7 +42,7 @@ public class OrderService {
      * "pela metade" ou estoque debitado sem pedido correspondente.
      */
     @Transactional
-    public OrderResponse checkout(User user) {
+    public OrderResponse checkout(User user, CheckoutRequest shippingRequest) {
         Cart cart = cartService.findOrCreateCart(user);
 
         if (cart.getItems().isEmpty()) {
@@ -86,6 +89,14 @@ public class OrderService {
 
             order.getItems().add(orderItem);
             total = total.add(product.getPrice().multiply(BigDecimal.valueOf(requested)));
+        }
+
+        if (shippingRequest != null && shippingRequest.hasShippingSelection()) {
+            BigDecimal shippingCost = resolveShippingCost(cart, shippingRequest);
+            order.setShippingCost(shippingCost);
+            order.setShippingCarrierName(shippingRequest.carrierName());
+            order.setShippingServiceName(shippingRequest.serviceName());
+            total = total.add(shippingCost);
         }
 
         order.setTotalAmount(total);
@@ -135,6 +146,32 @@ public class OrderService {
         return toResponse(order);
     }
 
+    /**
+     * Recota o frete no gateway no momento do checkout em vez de confiar no preço
+     * que o cliente devolveria junto da seleção — assim como o preço do produto é
+     * "congelado" a partir do banco, e não do que o carrinho supostamente mostrava.
+     */
+    private BigDecimal resolveShippingCost(Cart cart, CheckoutRequest shippingRequest) {
+        List<ShippingGateway.ShippingItem> items = cart.getItems().stream()
+                .map(i -> new ShippingGateway.ShippingItem(
+                        i.getProduct().getId().toString(),
+                        i.getProduct().getWeightKg(),
+                        i.getProduct().getHeightCm(),
+                        i.getProduct().getWidthCm(),
+                        i.getProduct().getLengthCm(),
+                        i.getProduct().getPrice(),
+                        i.getQuantity()))
+                .toList();
+
+        return shippingGateway.calculateShipping(shippingRequest.destinationCep(), items).stream()
+                .filter(r -> shippingRequest.carrierName().equals(r.carrierName())
+                        && shippingRequest.serviceName().equals(r.serviceName()))
+                .findFirst()
+                .map(ShippingGateway.ShippingQuoteResult::price)
+                .orElseThrow(() -> new ShippingOptionUnavailableException(
+                        shippingRequest.carrierName(), shippingRequest.serviceName()));
+    }
+
     private Order findEntity(Long id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pedido não encontrado: id " + id));
@@ -149,7 +186,8 @@ public class OrderService {
                         i.getUnitPriceAtPurchase()))
                 .toList();
 
-        return new OrderResponse(order.getId(), order.getStatus(), order.getTotalAmount(), items, order.getCreatedAt(),
+        return new OrderResponse(order.getId(), order.getStatus(), order.getTotalAmount(), order.getShippingCost(),
+                order.getShippingCarrierName(), order.getShippingServiceName(), items, order.getCreatedAt(),
                 order.getUser().getName(), order.getUser().getEmail());
     }
 }
