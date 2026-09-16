@@ -26,7 +26,9 @@ public class CartService {
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
 
-    @Transactional(readOnly = true)
+    // Usuários legados podem ainda não ter carrinho; findOrCreateCart pode
+    // persistir um, portanto esta transação não pode ser read-only.
+    @Transactional
     public CartResponse getCart(User user) {
         return toResponse(findOrCreateCart(user));
     }

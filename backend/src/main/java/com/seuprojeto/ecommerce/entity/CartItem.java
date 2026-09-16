@@ -26,4 +26,9 @@ public class CartItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    // Evita que duas alterações simultâneas de quantidade façam uma delas
+    // sobrescrever a outra silenciosamente.
+    @Version
+    private Long version;
 }

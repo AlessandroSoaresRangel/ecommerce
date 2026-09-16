@@ -52,6 +52,7 @@ services:
       REDIS_PORT: 6379
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set to a random value with at least 32 bytes}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
       STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-http://localhost:5173/checkout/success?session_id={CHECKOUT_SESSION_ID}}

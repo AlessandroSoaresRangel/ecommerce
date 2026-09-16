@@ -49,5 +49,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
         registry.add("spring.mail.host", MAILPIT::getHost);
         registry.add("spring.mail.port", () -> MAILPIT.getMappedPort(1025));
+        registry.add("jwt.secret", () -> "test-secret-with-at-least-32-bytes-for-hmac-sha256");
     }
 }

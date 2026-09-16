@@ -140,15 +140,16 @@ public class OrderService {
 
     @Transactional
     public OrderResponse updateStatus(Long id, OrderStatus newStatus) {
-        Order order = findEntity(id);
+        Order order = orderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pedido não encontrado: id " + id));
         OrderStatus previousStatus = order.getStatus();
 
         if (previousStatus == newStatus) {
             return toResponse(order);
         }
 
-        if (previousStatus == OrderStatus.CANCELED) {
-            throw new InvalidOrderStatusException("Pedido cancelado não pode ter seu status alterado.");
+        if (previousStatus == OrderStatus.CANCELED || previousStatus == OrderStatus.SHIPPED) {
+            throw new InvalidOrderStatusException("Pedido com status " + previousStatus + " não pode ter seu status alterado.");
         }
 
         // Voltar para PENDING reabriria o pagamento (createCheckoutSession só
@@ -157,8 +158,15 @@ public class OrderService {
             throw new InvalidOrderStatusException("Pedido não pode retroceder para PENDING a partir de " + previousStatus);
         }
 
-        if (previousStatus == OrderStatus.SHIPPED && newStatus == OrderStatus.PAID) {
-            throw new InvalidOrderStatusException("Pedido já enviado não pode retroceder para " + newStatus);
+        // Não devolvemos estoque de pedido pago/enviado sem um fluxo de
+        // estorno/retorno. Cancelamento administrativo só é seguro enquanto
+        // o pedido ainda aguarda pagamento.
+        if (newStatus == OrderStatus.CANCELED && previousStatus != OrderStatus.PENDING) {
+            throw new InvalidOrderStatusException("Apenas pedidos PENDING podem ser cancelados.");
+        }
+
+        if (newStatus == OrderStatus.SHIPPED && previousStatus != OrderStatus.PAID) {
+            throw new InvalidOrderStatusException("Apenas pedidos PAID podem ser enviados.");
         }
 
         if (newStatus == OrderStatus.CANCELED) {

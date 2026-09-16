@@ -13,10 +13,9 @@ const STATUSES: OrderStatus[] = ["PENDING", "PAID", "SHIPPED", "CANCELED"];
 // nada volta para PENDING e pedido enviado não volta para PAID.
 function isTransitionAllowed(from: OrderStatus, to: OrderStatus): boolean {
   if (from === to) return true;
-  if (from === "CANCELED") return false;
-  if (to === "PENDING") return false;
-  if (from === "SHIPPED" && to === "PAID") return false;
-  return true;
+  if (from === "PENDING") return to === "PAID" || to === "CANCELED";
+  if (from === "PAID") return to === "SHIPPED";
+  return false;
 }
 
 export function AdminOrdersPage() {

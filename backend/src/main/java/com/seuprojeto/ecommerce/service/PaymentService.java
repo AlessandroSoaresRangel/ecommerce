@@ -36,7 +36,10 @@ public class PaymentService {
 
     @Transactional
     public StripeCheckoutResponse createCheckoutSession(User requester, Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        // O lock cobre a verificação de status, a leitura do Payment e a
+        // emissão da sessão. Assim dois cliques/retries concorrentes não
+        // criam Checkout Sessions diferentes para o mesmo pedido.
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pedido não encontrado: id " + orderId));
 
         requireOwnerOrAdmin(requester, order);
@@ -69,10 +72,16 @@ public class PaymentService {
         Payment saved = paymentRepository.save(payment);
 
         StripeGateway.CheckoutSessionResult session = stripeGateway.createCheckoutSession(order, saved.getId());
-        saved.setStripeSessionId(session.sessionId());
-        Payment updated = paymentRepository.save(saved);
-
-        return new StripeCheckoutResponse(updated.getId(), order.getId(), session.checkoutUrl(), session.sessionId());
+        try {
+            saved.setStripeSessionId(session.sessionId());
+            // Força erros de banco/versão antes de devolver a URL. Caso a
+            // persistência falhe, a sessão externa é expirada abaixo.
+            Payment updated = paymentRepository.saveAndFlush(saved);
+            return new StripeCheckoutResponse(updated.getId(), order.getId(), session.checkoutUrl(), session.sessionId());
+        } catch (RuntimeException ex) {
+            stripeGateway.expireSession(session.sessionId());
+            throw ex;
+        }
     }
 
     /**

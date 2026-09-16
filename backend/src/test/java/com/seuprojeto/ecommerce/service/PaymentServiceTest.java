@@ -57,13 +57,14 @@ class PaymentServiceTest {
 
     @Test
     void donoDoPedidoConsegueIniciarOCheckout() {
-        when(orderRepository.findById(50L)).thenReturn(Optional.of(pedidoPendente));
+        when(orderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(pedidoPendente));
         when(paymentRepository.findByOrderId(50L)).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> {
             Payment p = inv.getArgument(0);
             if (p.getId() == null) p.setId(1L);
             return p;
         });
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(stripeGateway.createCheckoutSession(eq(pedidoPendente), anyLong()))
                 .thenReturn(new StripeGateway.CheckoutSessionResult("cs_test_123", "https://checkout.stripe.com/c/cs_test_123"));
 
@@ -81,9 +82,10 @@ class PaymentServiceTest {
     void reemitirOCheckoutExpiraASessaoStripeAnteriorParaNaoDeixarUmaUrlOrfaPagavel() {
         Payment paymentExistente = Payment.builder().id(1L).order(pedidoPendente)
                 .method("STRIPE").status(PaymentStatus.PENDING).stripeSessionId("cs_test_antiga").build();
-        when(orderRepository.findById(50L)).thenReturn(Optional.of(pedidoPendente));
+        when(orderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(pedidoPendente));
         when(paymentRepository.findByOrderId(50L)).thenReturn(Optional.of(paymentExistente));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(stripeGateway.createCheckoutSession(eq(pedidoPendente), anyLong()))
                 .thenReturn(new StripeGateway.CheckoutSessionResult("cs_test_nova", "https://checkout.stripe.com/c/cs_test_nova"));
 
@@ -96,13 +98,14 @@ class PaymentServiceTest {
 
     @Test
     void adminConsegueIniciarOCheckoutDePedidoDeOutroUsuario() {
-        when(orderRepository.findById(50L)).thenReturn(Optional.of(pedidoPendente));
+        when(orderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(pedidoPendente));
         when(paymentRepository.findByOrderId(50L)).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> {
             Payment p = inv.getArgument(0);
             if (p.getId() == null) p.setId(2L);
             return p;
         });
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(stripeGateway.createCheckoutSession(any(Order.class), anyLong()))
                 .thenReturn(new StripeGateway.CheckoutSessionResult("cs_test_456", "https://checkout.stripe.com/c/cs_test_456"));
 
@@ -113,7 +116,7 @@ class PaymentServiceTest {
 
     @Test
     void usuarioSemRelacaoComOPedidoNaoConsegueIniciarOCheckout() {
-        when(orderRepository.findById(50L)).thenReturn(Optional.of(pedidoPendente));
+        when(orderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(pedidoPendente));
 
         assertThatThrownBy(() -> paymentService.createCheckoutSession(estranho, 50L))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -126,7 +129,7 @@ class PaymentServiceTest {
     @Test
     void deveRecusarCheckoutDePedidoQueNaoEstaPendente() {
         pedidoPendente.setStatus(OrderStatus.PAID);
-        when(orderRepository.findById(50L)).thenReturn(Optional.of(pedidoPendente));
+        when(orderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(pedidoPendente));
 
         assertThatThrownBy(() -> paymentService.createCheckoutSession(dono, 50L))
                 .isInstanceOf(InvalidOrderStatusException.class);

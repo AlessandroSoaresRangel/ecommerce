@@ -34,10 +34,11 @@ O objetivo não foi só fazer um CRUD, mas mostrar decisões técnicas que apare
 ### Opção 1 — Docker (recomendado, não precisa instalar Java/Maven/Postgres)
 
 ```bash
+export JWT_SECRET="gere-um-segredo-aleatorio-longo-com-pelo-menos-32-bytes"
 docker compose up --build
 ```
 
-A API sobe em `http://localhost:8080`. Os e-mails "enviados" (mudança de status do pedido) podem ser vistos em `http://localhost:8025` (UI do Mailpit).
+A API sobe em `http://localhost:8080`. Os e-mails "enviados" (mudança de status do pedido) podem ser vistos em `http://localhost:8025` (UI do Mailpit). A aplicação não possui chave JWT padrão, para impedir que uma instalação publicada aceite tokens forjados.
 
 ### Opção 2 — Localmente
 

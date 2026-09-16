@@ -271,12 +271,12 @@ class OrderServiceTest {
     void updateStatusAlteraOStatusDoPedidoENotificaPorEmail() {
         Order order = Order.builder().id(5L).user(user).status(OrderStatus.PENDING)
                 .totalAmount(BigDecimal.TEN).build();
-        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(order));
 
-        OrderResponse response = orderService.updateStatus(5L, OrderStatus.SHIPPED);
+        OrderResponse response = orderService.updateStatus(5L, OrderStatus.PAID);
 
-        assertThat(response.status()).isEqualTo(OrderStatus.SHIPPED);
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(response.status()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         verify(emailService).sendOrderStatusChangedEmail(order, OrderStatus.PENDING);
     }
 
@@ -284,7 +284,7 @@ class OrderServiceTest {
     void updateStatusNaoEnviaEmailQuandoOStatusInformadoEhOMesmo() {
         Order order = Order.builder().id(5L).user(user).status(OrderStatus.PENDING)
                 .totalAmount(BigDecimal.TEN).build();
-        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(order));
 
         orderService.updateStatus(5L, OrderStatus.PENDING);
 
@@ -300,7 +300,7 @@ class OrderServiceTest {
         Payment payment = Payment.builder().id(1L).order(order).status(PaymentStatus.PENDING)
                 .stripeSessionId("cs_test_aberta").build();
 
-        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(order));
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
         when(paymentRepository.findByOrderId(5L)).thenReturn(Optional.of(payment));
 
@@ -317,7 +317,7 @@ class OrderServiceTest {
     void naoPermiteVoltarPedidoPagoParaPendente() {
         Order order = Order.builder().id(5L).user(user).status(OrderStatus.PAID)
                 .totalAmount(BigDecimal.TEN).build();
-        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> orderService.updateStatus(5L, OrderStatus.PENDING))
                 .isInstanceOf(InvalidOrderStatusException.class);
@@ -330,7 +330,7 @@ class OrderServiceTest {
     void naoPermiteAlterarStatusDePedidoCancelado() {
         Order order = Order.builder().id(5L).user(user).status(OrderStatus.CANCELED)
                 .totalAmount(BigDecimal.TEN).build();
-        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> orderService.updateStatus(5L, OrderStatus.PAID))
                 .isInstanceOf(InvalidOrderStatusException.class);
@@ -340,7 +340,7 @@ class OrderServiceTest {
 
     @Test
     void updateStatusLancaExcecaoQuandoPedidoNaoExiste() {
-        when(orderRepository.findById(404L)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(404L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.updateStatus(404L, OrderStatus.SHIPPED))
                 .isInstanceOf(ResourceNotFoundException.class);
